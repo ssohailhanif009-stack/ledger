@@ -4,54 +4,54 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Comprehensive Financial Management System</title>
-    <!-- Tailwind CSS for clean professional styling matching index.html -->
+    <!-- Tailwind CSS for clean layout, customized for small professional fonts -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
             font-size: 13px;
         }
+        /* MS Word style simple black border table */
         table.ms-word-table {
             border-collapse: collapse;
             width: 100%;
         }
         table.ms-word-table th, table.ms-word-table td {
-            border: 1px solid #475569;
+            border: 1px solid #000000;
             padding: 6px 8px;
             text-align: left;
         }
         table.ms-word-table th {
-            background-color: #1e293b;
-            color: #f1f5f9;
+            background-color: #f2f2f2;
             text-transform: uppercase;
             font-size: 12px;
         }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen p-6">
+<body class="bg-white text-gray-900 p-6">
 
     <div class="max-w-7xl mx-auto">
-        <!-- Main Heading -->
-        <h1 class="text-center text-xl font-extrabold uppercase tracking-wide mb-6 text-white border-b-2 border-blue-600 pb-3">
+        <!-- Main Heading with Navy Blue Shade -->
+        <h1 class="text-center text-xl font-bold uppercase tracking-wide mb-6 bg-blue-900 text-white py-3 px-4 rounded shadow">
             Comprehensive Personal Financial Saving & Expense Management System
         </h1>
 
         <!-- Top Controls: Filter & Actions -->
-        <div class="flex flex-wrap items-center justify-between gap-4 mb-6 bg-slate-800 p-4 border border-slate-700 rounded-lg shadow-md">
-            <div class="flex items-center gap-3">
-                <label for="monthYearFilter" class="font-bold text-xs uppercase text-slate-300">Filter By Month & Year:</label>
-                <select id="monthYearFilter" class="bg-slate-900 border border-slate-600 px-3 py-1 text-xs text-white rounded focus:outline-none focus:border-blue-500" onchange="filterData()">
-                    <option value="all">All Records</option>
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-4 bg-gray-50 p-3 border border-black">
+            <div class="flex items-center gap-2">
+                <label for="monthYearFilter" class="font-bold text-xs uppercase">Filter By Month & Year:</label>
+                <select id="monthYearFilter" class="border border-black px-2 py-1 text-xs bg-white" onchange="filterData()">
+                    <option value="ALL">All Months</option>
                 </select>
             </div>
             <div>
-                <button onclick="createNewRow()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-xs uppercase font-bold rounded transition-colors shadow">
+                <button onclick="createNewRow()" class="bg-black text-white px-4 py-1 text-xs uppercase font-semibold hover:bg-gray-800">
                     Create New Row
                 </button>
             </div>
         </div>
 
         <!-- Line List Table -->
-        <div class="overflow-x-auto bg-slate-800 border border-slate-700 rounded-lg shadow-xl">
+        <div class="overflow-x-auto">
             <table class="ms-word-table" id="savingTable">
                 <thead>
                     <tr>
@@ -72,7 +72,7 @@
     </div>
 
     <script>
-        // Populate dynamic month options and load filter on page load
+        // Load Month-Year filter from localStorage on page load
         window.addEventListener('DOMContentLoaded', () => {
             populateMonthFilterOptions();
             const savedFilter = localStorage.getItem('saving_system_filter');
@@ -92,7 +92,32 @@
 
         function populateMonthFilterOptions() {
             const filterSelect = document.getElementById('monthYearFilter');
-            // Keep 'all' option, generate last few years / months or let user type via standard input if preferred. Let's make it a month input + All option container or flexible dropdown.
+            // Keep ALL option
+            filterSelect.innerHTML = '<option value="ALL">All Months</option>';
+            
+            // Collect all unique months from localStorage keys
+            const keys = Object.keys(localStorage);
+            let uniqueMonths = new Set();
+            keys.forEach(key => {
+                if (key.startsWith('saving_system_rows_') && key !== 'saving_system_rows_ALL') {
+                    const monthVal = key.replace('saving_system_rows_', '');
+                    if (monthVal) uniqueMonths.add(monthVal);
+                }
+            });
+
+            // Also add current month if not present
+            const now = new Date();
+            const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            uniqueMonths.add(currentMonthStr);
+
+            // Sort descending
+            const sortedMonths = Array.from(uniqueMonths).sort().reverse();
+            sortedMonths.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = m;
+                filterSelect.appendChild(opt);
+            });
         }
 
         // Save filter change to localStorage
@@ -102,18 +127,18 @@
         });
 
         function getStorageKey() {
-            const filterVal = document.getElementById('monthYearFilter').value || 'all';
+            const filterVal = document.getElementById('monthYearFilter').value || 'ALL';
             return `saving_system_rows_${filterVal}`;
         }
 
         function createNewRow(savedData = null) {
             const tbody = document.getElementById('tableBody');
             const row = document.createElement('tr');
-            row.className = "bg-slate-800 hover:bg-slate-700/50 transition-colors";
 
-            let dateTimeStr = "";
+            // Format Date & Time for datetime-local input (YYYY-MM-DDTHH:MM)
+            let dateTimeVal = "";
             if (savedData && savedData.dateTime) {
-                dateTimeStr = savedData.dateTime;
+                dateTimeVal = savedData.dateTime;
             } else {
                 const now = new Date();
                 const year = now.getFullYear();
@@ -121,7 +146,7 @@
                 const day = String(now.getDate()).padStart(2, '0');
                 const hours = String(now.getHours()).padStart(2, '0');
                 const minutes = String(now.getMinutes()).padStart(2, '0');
-                dateTimeStr = `${year}-${month}-${day}T${hours}:${minutes}`;
+                dateTimeVal = `${year}-${month}-${day}T${hours}:${minutes}`;
             }
 
             const amountType = savedData ? savedData.amountType : '';
@@ -130,27 +155,29 @@
             const used = savedData ? savedData.used : '';
             const balance = savedData ? savedData.balance : '';
             const remarks = savedData ? savedData.remarks : '';
+            
+            // Check if fields should be locked initially if they have values
+            const receivedLocked = received !== '' ? 'readonly bg-gray-100' : '';
+            const usedLocked = used !== '' ? 'readonly bg-gray-100' : '';
 
             row.innerHTML = `
+                <td><input type="datetime-local" value="${dateTimeVal}" class="border border-black p-1 text-xs w-full datetime-input" onchange="saveDataToStorage()"></td>
                 <td>
-                    <input type="datetime-local" value="${dateTimeStr}" class="bg-slate-900 border border-slate-600 p-1 text-xs text-white rounded w-full date-input" onchange="saveDataToStorage()">
-                </td>
-                <td>
-                    <select class="bg-slate-900 border border-slate-600 p-1 text-xs text-white rounded w-full amount-type-select" onchange="handleTypeChange(this)">
-                        <option value="" disabled ${amountType === '' ? 'selected' : ''}>-- Select Type --</option>
+                    <select class="border border-black p-1 text-xs w-full amount-type-select" onchange="handleTypeChange(this)">
+                        <option value="" ${amountType === '' ? 'selected' : ''} disabled>-- Select Type --</option>
                         <option value="Salary" ${amountType === 'Salary' ? 'selected' : ''}>Salary</option>
                         <option value="Pension" ${amountType === 'Pension' ? 'selected' : ''}>Pension</option>
                         <option value="Other" ${amountType === 'Other' ? 'selected' : ''}>Other</option>
                     </select>
                     <div class="detail-container mt-1 ${amountType === 'Other' ? '' : 'hidden'}">
-                        <input type="text" placeholder="Enter Detail" value="${detailText}" class="bg-slate-900 border border-slate-600 p-1 text-xs text-white rounded w-full detail-input" oninput="saveDataToStorage()">
+                        <input type="text" placeholder="Enter Detail" value="${detailText}" class="border border-black p-1 text-xs w-full detail-input" oninput="saveDataToStorage()">
                     </div>
                 </td>
-                <td><input type="number" value="${received}" class="bg-slate-900 border border-slate-600 p-1 text-xs text-white rounded w-full received-input" placeholder="0" oninput="calculateBalances(); saveDataToStorage();" onblur="lockInput(this)" ondblclick="unlockInput(this)"></td>
-                <td><input type="number" value="${used}" class="bg-slate-900 border border-slate-600 p-1 text-xs text-white rounded w-full used-input" placeholder="0" oninput="calculateBalances(); saveDataToStorage();" onblur="lockInput(this)" ondblclick="unlockInput(this)"></td>
-                <td><span class="balance-display font-semibold text-xs text-emerald-400">${balance !== '' ? balance : '0'}</span></td>
-                <td><input type="text" value="${remarks}" class="bg-slate-900 border border-slate-600 p-1 text-xs text-white rounded w-full remarks-input" placeholder="Reason/Where spent" oninput="saveDataToStorage()"></td>
-                <td class="text-center"><button onclick="deleteRow(this)" class="text-red-400 font-bold text-xs hover:text-red-300 underline">Delete</button></td>
+                <td><input type="number" value="${received}" ${receivedLocked} class="border border-black p-1 text-xs w-full received-input" placeholder="0" onblur="lockInput(this)" oninput="calculateBalances(); saveDataToStorage();" ondblclick="unlockInput(this)"></td>
+                <td><input type="number" value="${used}" ${usedLocked} class="border border-black p-1 text-xs w-full used-input" placeholder="0" onblur="lockInput(this)" oninput="calculateBalances(); saveDataToStorage();" ondblclick="unlockInput(this)"></td>
+                <td><span class="balance-display font-semibold text-xs">${balance !== '' ? balance : '0'}</span></td>
+                <td><input type="text" value="${remarks}" class="border border-black p-1 text-xs w-full remarks-input" placeholder="Reason/Where spent" oninput="saveDataToStorage()"></td>
+                <td class="text-center"><button onclick="deleteRow(this)" class="text-red-600 font-bold text-xs hover:underline">Delete</button></td>
             `;
 
             tbody.appendChild(row);
@@ -165,22 +192,24 @@
                 detailContainer.classList.remove('hidden');
             } else {
                 detailContainer.classList.add('hidden');
-                detailContainer.querySelector('.detail-input').value = '';
+                const detailInput = detailContainer.querySelector('.detail-input');
+                if(detailInput) detailInput.value = '';
             }
             saveDataToStorage();
         }
 
+        // Lock input when clicking outside or losing focus after entering numbers
         function lockInput(input) {
-            if (input.value !== "") {
+            if (input.value.trim() !== '') {
                 input.setAttribute('readonly', true);
-                input.classList.add('bg-slate-700', 'cursor-not-allowed', 'opacity-80');
+                input.classList.add('bg-gray-100');
             }
         }
 
+        // Optional: Double click to unlock if needed
         function unlockInput(input) {
             input.removeAttribute('readonly');
-            input.classList.remove('bg-slate-700', 'cursor-not-allowed', 'opacity-80');
-            input.focus();
+            input.classList.remove('bg-gray-100');
         }
 
         function deleteRow(btn) {
@@ -217,13 +246,20 @@
             const dataToSave = [];
 
             rows.forEach(row => {
-                const dateTime = row.querySelector('.date-input').value;
-                const amountType = row.querySelector('.amount-type-select').value;
-                const detailText = row.querySelector('.detail-input') ? row.querySelector('.detail-input').value : '';
-                const received = row.querySelector('.received-input').value;
-                const used = row.querySelector('.used-input').value;
-                const balance = row.querySelector('.balance-display').innerText;
-                const remarks = row.querySelector('.remarks-input').value;
+                const dateTimeInput = row.querySelector('.datetime-input');
+                const dateTime = dateTimeInput ? dateTimeInput.value : '';
+                const amountTypeSelect = row.querySelector('.amount-type-select');
+                const amountType = amountTypeSelect ? amountTypeSelect.value : '';
+                const detailInput = row.querySelector('.detail-input');
+                const detailText = detailInput ? detailInput.value : '';
+                const receivedInput = row.querySelector('.received-input');
+                const received = receivedInput ? receivedInput.value : '';
+                const usedInput = row.querySelector('.used-input');
+                const used = usedInput ? usedInput.value : '';
+                const balanceDisplay = row.querySelector('.balance-display');
+                const balance = balanceDisplay ? balanceDisplay.innerText : '';
+                const remarksInput = row.querySelector('.remarks-input');
+                const remarks = remarksInput ? remarksInput.value : '';
 
                 dataToSave.push({
                     dateTime,
@@ -237,11 +273,12 @@
             });
 
             localStorage.setItem(getStorageKey(), JSON.stringify(dataToSave));
+            populateMonthFilterOptions();
         }
 
         function loadTableData() {
             const tbody = document.getElementById('tableBody');
-            tbody.innerHTML = '';
+            tbody.innerHTML = ''; // Clear current rows
 
             const savedData = JSON.parse(localStorage.getItem(getStorageKey()));
             if (savedData && savedData.length > 0) {
