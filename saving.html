@@ -71,46 +71,62 @@
         </div>
     </div>
 
+    <!-- Firebase SDK Integration -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-analytics.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBNDifUQOSYt_nQSeL_ZIxXhfNzTGQJGdA",
+            authDomain: "ledger-df7a0.firebaseapp.com",
+            projectId: "ledger-df7a0",
+            storageBucket: "ledger-df7a0.firebasestorage.app",
+            messagingSenderId: "854106995075",
+            appId: "1:854106995075:web:198b3702c4214197929eb6",
+            measurementId: "G-9C0C5XSD5K"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        window.firebaseApp = app;
+    </script>
+
     <script>
-        // Load Month-Year filter from localStorage on page load
+        // In-memory data store instead of local storage
+        let applicationData = [];
+
         window.addEventListener('DOMContentLoaded', () => {
             populateMonthFilterOptions();
-            const savedFilter = localStorage.getItem('saving_system_filter');
-            const filterInput = document.getElementById('monthYearFilter');
-            
-            if (savedFilter) {
-                filterInput.value = savedFilter;
-            } else {
-                const now = new Date();
-                const year = now.getFullYear();
-                const month = String(now.getMonth() + 1).padStart(2, '0');
-                filterInput.value = `${year}-${month}`;
-                localStorage.setItem('saving_system_filter', filterInput.value);
-            }
             loadTableData();
         });
 
         function populateMonthFilterOptions() {
             const filterSelect = document.getElementById('monthYearFilter');
-            // Keep ALL option
+            const currentSelected = filterSelect.value;
+            
             filterSelect.innerHTML = '<option value="ALL">All Months</option>';
             
-            // Collect all unique months from localStorage keys
-            const keys = Object.keys(localStorage);
             let uniqueMonths = new Set();
-            keys.forEach(key => {
-                if (key.startsWith('saving_system_rows_') && key !== 'saving_system_rows_ALL') {
-                    const monthVal = key.replace('saving_system_rows_', '');
-                    if (monthVal) uniqueMonths.add(monthVal);
+            applicationData.forEach(item => {
+                if (item.dateTime) {
+                    // Extract YYYY-MM from date string (DD-MM-YYYY or YYYY-MM-DD)
+                    let parts = item.dateTime.split(' ')[0];
+                    if (parts.includes('-')) {
+                        let subParts = parts.split('-');
+                        if (subParts[0].length === 4) {
+                            uniqueMonths.add(`${subParts[0]}-${subParts[1]}`);
+                        } else if (subParts[2].length === 4) {
+                            uniqueMonths.add(`${subParts[2]}-${subParts[1]}`);
+                        }
+                    }
                 }
             });
 
-            // Also add current month if not present
+            // Include current month/year if not present
             const now = new Date();
             const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
             uniqueMonths.add(currentMonthStr);
 
-            // Sort descending
             const sortedMonths = Array.from(uniqueMonths).sort().reverse();
             sortedMonths.forEach(m => {
                 const opt = document.createElement('option');
@@ -118,35 +134,32 @@
                 opt.textContent = m;
                 filterSelect.appendChild(opt);
             });
-        }
 
-        // Save filter change to localStorage
-        document.getElementById('monthYearFilter').addEventListener('change', function() {
-            localStorage.setItem('saving_system_filter', this.value);
-            loadTableData();
-        });
-
-        function getStorageKey() {
-            const filterVal = document.getElementById('monthYearFilter').value || 'ALL';
-            return `saving_system_rows_${filterVal}`;
+            if (currentSelected) {
+                filterSelect.value = currentSelected;
+            }
         }
 
         function createNewRow(savedData = null) {
             const tbody = document.getElementById('tableBody');
             const row = document.createElement('tr');
 
-            // Format Date & Time for datetime-local input (YYYY-MM-DDTHH:MM)
-            let dateTimeVal = "";
+            // Date format: Calendar picker showing DD-MM-YYYY appearance or standard date type
+            let dateVal = "";
+            let timeVal = "";
             if (savedData && savedData.dateTime) {
-                dateTimeVal = savedData.dateTime;
-            } else {
+                let dtParts = savedData.dateTime.split(' ');
+                dateVal = dtParts[0] || "";
+                timeVal = dtParts[1] || "";
+            }
+            
+            if (!dateVal) {
                 const now = new Date();
-                const year = now.getFullYear();
-                const month = String(now.getMonth() + 1).padStart(2, '0');
                 const day = String(now.getDate()).padStart(2, '0');
-                const hours = String(now.getHours()).padStart(2, '0');
-                const minutes = String(now.getMinutes()).padStart(2, '0');
-                dateTimeVal = `${year}-${month}-${day}T${hours}:${minutes}`;
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const year = now.getFullYear();
+                dateVal = `${year}-${month}-${day}`; // For date input format YYYY-MM-DD
+                timeVal = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
             }
 
             const amountType = savedData ? savedData.amountType : '';
@@ -156,12 +169,12 @@
             const balance = savedData ? savedData.balance : '';
             const remarks = savedData ? savedData.remarks : '';
             
-            // Check if fields should be locked initially if they have values
+            // Permanent lock if values exist
             const receivedLocked = received !== '' ? 'readonly bg-gray-100' : '';
             const usedLocked = used !== '' ? 'readonly bg-gray-100' : '';
 
             row.innerHTML = `
-                <td><input type="datetime-local" value="${dateTimeVal}" class="border border-black p-1 text-xs w-full datetime-input" onchange="saveDataToStorage()"></td>
+                <td><input type="date" value="${dateVal}" class="border border-black p-1 text-xs w-full date-input" data-time="${timeVal}" onchange="saveDataToMemory()"></td>
                 <td>
                     <select class="border border-black p-1 text-xs w-full amount-type-select" onchange="handleTypeChange(this)">
                         <option value="" ${amountType === '' ? 'selected' : ''} disabled>-- Select Type --</option>
@@ -170,19 +183,19 @@
                         <option value="Other" ${amountType === 'Other' ? 'selected' : ''}>Other</option>
                     </select>
                     <div class="detail-container mt-1 ${amountType === 'Other' ? '' : 'hidden'}">
-                        <input type="text" placeholder="Enter Detail" value="${detailText}" class="border border-black p-1 text-xs w-full detail-input" oninput="saveDataToStorage()">
+                        <input type="text" placeholder="Enter Detail" value="${detailText}" class="border border-black p-1 text-xs w-full detail-input" oninput="saveDataToMemory()">
                     </div>
                 </td>
-                <td><input type="number" value="${received}" ${receivedLocked} class="border border-black p-1 text-xs w-full received-input" placeholder="0" onblur="lockInput(this)" oninput="calculateBalances(); saveDataToStorage();" ondblclick="unlockInput(this)"></td>
-                <td><input type="number" value="${used}" ${usedLocked} class="border border-black p-1 text-xs w-full used-input" placeholder="0" onblur="lockInput(this)" oninput="calculateBalances(); saveDataToStorage();" ondblclick="unlockInput(this)"></td>
+                <td><input type="number" value="${received}" ${receivedLocked} class="border border-black p-1 text-xs w-full received-input" placeholder="0" onblur="lockInput(this)" oninput="calculateBalances(); saveDataToMemory();"></td>
+                <td><input type="number" value="${used}" ${usedLocked} class="border border-black p-1 text-xs w-full used-input" placeholder="0" onblur="lockInput(this)" oninput="calculateBalances(); saveDataToMemory();"></td>
                 <td><span class="balance-display font-semibold text-xs">${balance !== '' ? balance : '0'}</span></td>
-                <td><input type="text" value="${remarks}" class="border border-black p-1 text-xs w-full remarks-input" placeholder="Reason/Where spent" oninput="saveDataToStorage()"></td>
+                <td><input type="text" value="${remarks}" class="border border-black p-1 text-xs w-full remarks-input" placeholder="Reason/Where spent" oninput="saveDataToMemory()"></td>
                 <td class="text-center"><button onclick="deleteRow(this)" class="text-red-600 font-bold text-xs hover:underline">Delete</button></td>
             `;
 
             tbody.appendChild(row);
             calculateBalances();
-            saveDataToStorage();
+            saveDataToMemory();
         }
 
         function handleTypeChange(selectElement) {
@@ -195,10 +208,10 @@
                 const detailInput = detailContainer.querySelector('.detail-input');
                 if(detailInput) detailInput.value = '';
             }
-            saveDataToStorage();
+            saveDataToMemory();
         }
 
-        // Lock input when clicking outside or losing focus after entering numbers
+        // Lock input permanently once data is entered and lost focus
         function lockInput(input) {
             if (input.value.trim() !== '') {
                 input.setAttribute('readonly', true);
@@ -206,17 +219,11 @@
             }
         }
 
-        // Optional: Double click to unlock if needed
-        function unlockInput(input) {
-            input.removeAttribute('readonly');
-            input.classList.remove('bg-gray-100');
-        }
-
         function deleteRow(btn) {
             const row = btn.closest('tr');
             row.remove();
             calculateBalances();
-            saveDataToStorage();
+            saveDataToMemory();
         }
 
         function calculateBalances() {
@@ -241,13 +248,25 @@
             });
         }
 
-        function saveDataToStorage() {
+        function saveDataToMemory() {
             const rows = document.querySelectorAll('#tableBody tr');
-            const dataToSave = [];
+            applicationData = [];
 
             rows.forEach(row => {
-                const dateTimeInput = row.querySelector('.datetime-input');
-                const dateTime = dateTimeInput ? dateTimeInput.value : '';
+                const dateInput = row.querySelector('.date-input');
+                let rawDate = dateInput ? dateInput.value : '';
+                let timePart = dateInput ? dateInput.getAttribute('data-time') : '';
+                
+                // Format display as DD-MM-YYYY
+                let formattedDate = rawDate;
+                if (rawDate && rawDate.includes('-')) {
+                    let parts = rawDate.split('-');
+                    if (parts.length === 3) {
+                        formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                    }
+                }
+                const dateTime = `${formattedDate} ${timePart || '00:00:00'}`;
+
                 const amountTypeSelect = row.querySelector('.amount-type-select');
                 const amountType = amountTypeSelect ? amountTypeSelect.value : '';
                 const detailInput = row.querySelector('.detail-input');
@@ -261,7 +280,7 @@
                 const remarksInput = row.querySelector('.remarks-input');
                 const remarks = remarksInput ? remarksInput.value : '';
 
-                dataToSave.push({
+                applicationData.push({
                     dateTime,
                     amountType,
                     detailText,
@@ -272,20 +291,32 @@
                 });
             });
 
-            localStorage.setItem(getStorageKey(), JSON.stringify(dataToSave));
             populateMonthFilterOptions();
         }
 
         function loadTableData() {
             const tbody = document.getElementById('tableBody');
-            tbody.innerHTML = ''; // Clear current rows
+            tbody.innerHTML = ''; 
 
-            const savedData = JSON.parse(localStorage.getItem(getStorageKey()));
-            if (savedData && savedData.length > 0) {
-                savedData.forEach(item => {
+            const filterVal = document.getElementById('monthYearFilter').value;
+
+            applicationData.forEach(item => {
+                // Filter logic
+                if (filterVal === 'ALL') {
                     createNewRow(item);
-                });
-            }
+                } else {
+                    // Check if item matches selected YYYY-MM
+                    if (item.dateTime) {
+                        let parts = item.dateTime.split(' ')[0].split('-'); // DD-MM-YYYY
+                        if (parts.length === 3) {
+                            let itemMonthYear = `${parts[2]}-${parts[1]}`;
+                            if (itemMonthYear === filterVal) {
+                                createNewRow(item);
+                            }
+                        }
+                    }
+                }
+            });
             calculateBalances();
         }
 
