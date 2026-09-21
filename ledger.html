@@ -83,8 +83,8 @@
                     </button>
                 </div>
 
-                <!-- Excel-like Table View with horizontal scroll on small devices -->
-                <div class="border rounded relative overflow-x-auto">
+                <!-- Excel-like Table View with horizontal & vertical freeze scroll -->
+                <div class="border rounded relative overflow-x-auto max-h-[550px] overflow-y-auto">
                     <table class="w-full text-left border-collapse excel-table min-w-[750px]">
                         <thead class="sticky-header text-[10px] uppercase text-slate-200">
                             <tr>
@@ -148,7 +148,7 @@
                 <div class="flex items-center gap-2">
                     <div class="flex-1">
                         <label class="block font-medium text-slate-700 mb-0.5">Mobile No.</label>
-                        <input type="text" id="pdMobile" oninput="updatePersonalDataField('mobile', this.value)" class="w-full border rounded px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-blue-500" placeholder="Number or NA">
+                        <input type="text" id="pdMobile" oninput="validateMobileNumber(this.value)" class="w-full border rounded px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-blue-500" placeholder="Only numbers">
                     </div>
                     <div class="flex items-center pt-4">
                         <label class="flex items-center gap-1 cursor-pointer">
@@ -163,7 +163,7 @@
                 <div>
                     <label class="block font-medium text-slate-700 mb-0.5">Picture (Gallery / Camera)</label>
                     <div class="flex items-center gap-2">
-                        <input type="file" id="pdPicture" accept="image/*" onchange="handlePersonalPictureUpload(event)" class="w-full text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-slate-100 file:text-slate-700">
+                        <input type="file" id="pdPicture" accept="image/*" capture="environment" onchange="handlePersonalPictureUpload(event)" class="w-full text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-slate-100 file:text-slate-700">
                         <label class="flex items-center gap-1 cursor-pointer whitespace-nowrap">
                             <input type="checkbox" id="pdPictureNA" onchange="toggleNAFile(this.checked)" class="rounded"> <span class="text-[11px]">NA</span>
                         </label>
@@ -172,12 +172,18 @@
                         <img id="pdPicturePreviewImg" src="" alt="Personal Picture" class="h-16 w-16 object-cover rounded border">
                     </div>
                 </div>
-                <div class="flex justify-end gap-2 pt-2 border-t">
-                    <button type="button" onclick="downloadPDFReport()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded font-medium shadow flex items-center gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                        Download PDF
-                    </button>
-                    <button type="button" onclick="closePersonalDataModal()" class="px-3 py-1.5 border rounded text-slate-600 hover:bg-slate-50 font-medium">Close</button>
+                <div class="flex justify-between items-center pt-2 border-t">
+                    <div class="flex items-center gap-2">
+                        <button type="button" id="savePdBtn" onclick="savePersonalDataForm()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded font-medium shadow">Save Data</button>
+                        <button type="button" id="editPdBtn" onclick="unlockPersonalDataForm()" class="hidden bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded font-medium shadow">Edit Data</button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="downloadPDFReport()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded font-medium shadow flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                            Download PDF
+                        </button>
+                        <button type="button" onclick="closePersonalDataModal()" class="px-3 py-1.5 border rounded text-slate-600 hover:bg-slate-50 font-medium">Close</button>
+                    </div>
                 </div>
             </form>
         </div>
@@ -281,10 +287,11 @@
                     fullName: ledger.fullName || '',
                     address: '',
                     mobile: '',
-                    reason: ledger.purpose || '',
+                    reason: '',
                     picture: '',
                     mobileNA: false,
-                    pictureNA: false
+                    pictureNA: false,
+                    isSaved: false
                 };
             }
 
@@ -292,9 +299,13 @@
             document.getElementById('pdFullName').value = pd.fullName || '';
             document.getElementById('pdAddress').value = pd.address || '';
             document.getElementById('pdMobile').value = pd.mobile || '';
-            document.getElementById('pdMobile').disabled = pd.mobileNA || false;
+            document.getElementById('pdMobile').disabled = pd.mobileNA || pd.isSaved || false;
             document.getElementById('pdMobileNA').checked = pd.mobileNA || false;
+            document.getElementById('pdMobileNA').disabled = pd.isSaved || false;
             document.getElementById('pdReason').value = pd.reason || '';
+            document.getElementById('pdReason').disabled = pd.isSaved || false;
+            document.getElementById('pdFullName').disabled = pd.isSaved || false;
+            document.getElementById('pdAddress').disabled = pd.isSaved || false;
 
             const picInput = document.getElementById('pdPicture');
             const picContainer = document.getElementById('pdPicturePreviewContainer');
@@ -302,7 +313,8 @@
             const picNACheckbox = document.getElementById('pdPictureNA');
 
             picNACheckbox.checked = pd.pictureNA || false;
-            picInput.disabled = pd.pictureNA || false;
+            picNACheckbox.disabled = pd.isSaved || false;
+            picInput.disabled = pd.pictureNA || pd.isSaved || false;
 
             if (pd.picture) {
                 picImg.src = pd.picture;
@@ -311,6 +323,8 @@
                 picImg.src = '';
                 picContainer.classList.add('hidden');
             }
+
+            updateFormLockState(pd.isSaved);
 
             document.getElementById('personalDataModal').classList.remove('hidden');
             document.getElementById('personalDataModal').classList.add('flex');
@@ -327,6 +341,12 @@
             if (!ledger.personalData) ledger.personalData = {};
             ledger.personalData[field] = value;
             saveData();
+        }
+
+        function validateMobileNumber(value) {
+            const cleanVal = value.replace(/[^0-9]/g, '');
+            document.getElementById('pdMobile').value = cleanVal;
+            updatePersonalDataField('mobile', cleanVal);
         }
 
         function toggleNA(fieldId, dataKey, isChecked) {
@@ -409,6 +429,60 @@
             reader.readAsDataURL(file);
         }
 
+        function savePersonalDataForm() {
+            const ledger = ledgers.find(l => l.id === activeLedgerId);
+            if (!ledger) return;
+            if (!ledger.personalData) ledger.personalData = {};
+
+            ledger.personalData.isSaved = true;
+            saveData();
+
+            document.getElementById('pdFullName').disabled = true;
+            document.getElementById('pdAddress').disabled = true;
+            document.getElementById('pdMobile').disabled = true;
+            document.getElementById('pdMobileNA').disabled = true;
+            document.getElementById('pdReason').disabled = true;
+            document.getElementById('pdPicture').disabled = true;
+            document.getElementById('pdPictureNA').disabled = true;
+
+            updateFormLockState(true);
+            alert('Personal data successfully save aur lock ho gaya hai!');
+        }
+
+        function unlockPersonalDataForm() {
+            if (confirm('Kya aap personal data ko dobara edit karna chahte hain?')) {
+                const ledger = ledgers.find(l => l.id === activeLedgerId);
+                if (!ledger) return;
+                if (!ledger.personalData) ledger.personalData = {};
+
+                ledger.personalData.isSaved = false;
+                saveData();
+
+                const pd = ledger.personalData;
+                document.getElementById('pdFullName').disabled = false;
+                document.getElementById('pdAddress').disabled = false;
+                document.getElementById('pdMobile').disabled = pd.mobileNA;
+                document.getElementById('pdMobileNA').disabled = false;
+                document.getElementById('pdReason').disabled = false;
+                document.getElementById('pdPicture').disabled = pd.pictureNA;
+                document.getElementById('pdPictureNA').disabled = false;
+
+                updateFormLockState(false);
+            }
+        }
+
+        function updateFormLockState(isSaved) {
+            const saveBtn = document.getElementById('savePdBtn');
+            const editBtn = document.getElementById('editPdBtn');
+            if (isSaved) {
+                saveBtn.classList.add('hidden');
+                editBtn.classList.remove('hidden');
+            } else {
+                saveBtn.classList.remove('hidden');
+                editBtn.classList.add('hidden');
+            }
+        }
+
         function downloadPDFReport() {
             const ledger = ledgers.find(l => l.id === activeLedgerId);
             if (!ledger) return;
@@ -422,13 +496,13 @@
                 <head>
                     <title>Personal Data - ${ledger.fullName}</title>
                     <style>
-                        body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
-                        h2 { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; }
-                        .info-group { margin-bottom: 15px; font-size: 14px; }
-                        .label { font-weight: bold; display: inline-block; width: 200px; }
+                        body { font-family: Arial, sans-serif; padding: 25px; color: #333; }
+                        h2 { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 25px; }
+                        .info-group { margin-bottom: 15px; font-size: 15px; }
+                        .label { font-weight: bold; display: inline-block; width: 220px; }
                         .value { display: inline-block; }
-                        .img-container { margin-top: 20px; text-align: center; }
-                        .img-container img { max-width: 200px; max-height: 200px; border: 1px solid #ccc; border-radius: 4px; }
+                        .img-container { margin-top: 30px; text-align: center; }
+                        .img-container img { max-width: 220px; max-height: 220px; border: 1px solid #ccc; border-radius: 4px; }
                     </style>
                 </head>
                 <body>
@@ -440,7 +514,9 @@
                     <div class="info-group"><span class="label">Reason for borrowing:</span><span class="value">${pd.reason || 'N/A'}</span></div>
                     ${pd.picture ? `<div class="img-container"><div><strong>Picture:</strong></div><br><img src="${pd.picture}" /></div>` : ''}
                     <script>
-                        window.onload = function() { window.print(); }
+                        window.onload = function() { 
+                            window.print(); 
+                        }
                     <\/script>
                 </body>
                 </html>
@@ -464,10 +540,11 @@
                     fullName: fullName,
                     address: '',
                     mobile: '',
-                    reason: purpose,
+                    reason: '',
                     picture: '',
                     mobileNA: false,
-                    pictureNA: false
+                    pictureNA: false,
+                    isSaved: false
                 }
             };
 
@@ -579,7 +656,7 @@
                     <td class="p-1.5 whitespace-nowrap">
                         <div class="flex items-center gap-1.5">
                             ${tx.proofImage ? `<img src="${tx.proofImage}" onclick="openImageModal('${tx.proofImage}')" class="w-7 h-7 object-cover rounded cursor-pointer border hover:opacity-80 shadow-sm" title="Click to view">` : ''}
-                            <input type="file" accept="image/*" onchange="handleImageUpload(event, '${tx.id}')" class="text-[10px] w-24 text-slate-500 file:mr-1 file:py-0.5 file:px-1.5 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                            <input type="file" accept="image/*" capture="environment" onchange="handleImageUpload(event, '${tx.id}')" class="text-[10px] w-24 text-slate-500 file:mr-1 file:py-0.5 file:px-1.5 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
                         </div>
                     </td>
                     <td class="p-1.5 text-center">
