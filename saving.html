@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprehensive Financial Management System</title>
+    <!-- Tailwind CSS for clean layout, customized for small professional fonts -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-size: 13px;
+        }
+        /* MS Word style simple black border table */
+        table.ms-word-table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        table.ms-word-table th, table.ms-word-table td {
+            border: 1px solid #000000;
+            padding: 6px 8px;
+            text-align: left;
+        }
+        table.ms-word-table th {
+            background-color: #f2f2f2;
+            text-transform: uppercase;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body class="bg-white text-gray-900 p-6">
+
+    <div class="max-w-7xl mx-auto">
+        <!-- Main Heading -->
+        <h1 class="text-center text-xl font-bold uppercase tracking-wide mb-6">
+            Comprehensive Personal Financial Saving & Expense Management System
+        </h1>
+
+        <!-- Top Controls: Filter & Actions -->
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-4 bg-gray-50 p-3 border border-black">
+            <div class="flex items-center gap-2">
+                <label for="monthYearFilter" class="font-bold text-xs uppercase">Filter By Month & Year:</label>
+                <input type="month" id="monthYearFilter" class="border border-black px-2 py-1 text-xs bg-white" onchange="filterData()">
+            </div>
+            <div>
+                <button onclick="createNewRow()" class="bg-black text-white px-4 py-1 text-xs uppercase font-semibold hover:bg-gray-800">
+                    Create New Row
+                </button>
+            </div>
+        </div>
+
+        <!-- Line List Table -->
+        <div class="overflow-x-auto">
+            <table class="ms-word-table" id="savingTable">
+                <thead>
+                    <tr>
+                        <th>Date and Time</th>
+                        <th>Amount Type</th>
+                        <th>Amount Received</th>
+                        <th>Used</th>
+                        <th>Balance</th>
+                        <th>Remarks</th>
+                        <th class="text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <!-- Dynamic rows will be inserted here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Load Month-Year filter from localStorage on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedFilter = localStorage.getItem('saving_system_filter');
+            const filterInput = document.getElementById('monthYearFilter');
+            
+            if (savedFilter) {
+                filterInput.value = savedFilter;
+            } else {
+                // Default to current year-month
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                filterInput.value = `${year}-${month}`;
+                localStorage.setItem('saving_system_filter', filterInput.value);
+            }
+            loadTableData();
+        });
+
+        // Save filter change to localStorage
+        document.getElementById('monthYearFilter').addEventListener('change', function() {
+            localStorage.setItem('saving_system_filter', this.value);
+            loadTableData();
+        });
+
+        function getStorageKey() {
+            const filterVal = document.getElementById('monthYearFilter').value || 'default';
+            return `saving_system_rows_${filterVal}`;
+        }
+
+        function createNewRow(savedData = null) {
+            const tbody = document.getElementById('tableBody');
+            const row = document.createElement('tr');
+
+            // Format Date & Time (DD-MM-YYYY HH:MM:SS)
+            let dateTimeStr = "";
+            if (savedData && savedData.dateTime) {
+                dateTimeStr = savedData.dateTime;
+            } else {
+                const now = new Date();
+                const day = String(now.getDate()).padStart(2, '0');
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const year = now.getFullYear();
+                const time = now.toLocaleTimeString();
+                dateTimeStr = `${day}-${month}-${year} ${time}`;
+            }
+
+            const amountType = savedData ? savedData.amountType : 'Salary';
+            const detailText = savedData ? savedData.detailText : '';
+            const received = savedData ? savedData.received : '';
+            const used = savedData ? savedData.used : '';
+            const balance = savedData ? savedData.balance : '';
+            const remarks = savedData ? savedData.remarks : '';
+
+            row.innerHTML = `
+                <td class="text-xs">${dateTimeStr}</td>
+                <td>
+                    <select class="border border-black p-1 text-xs w-full amount-type-select" onchange="handleTypeChange(this)">
+                        <option value="Salary" ${amountType === 'Salary' ? 'selected' : ''}>Salary</option>
+                        <option value="Pension" ${amountType === 'Pension' ? 'selected' : ''}>Pension</option>
+                        <option value="Other" ${amountType === 'Other' ? 'selected' : ''}>Other</option>
+                    </select>
+                    <div class="detail-container mt-1 ${amountType === 'Other' ? '' : 'hidden'}">
+                        <input type="text" placeholder="Enter Detail" value="${detailText}" class="border border-black p-1 text-xs w-full detail-input" oninput="saveDataToStorage()">
+                    </div>
+                </td>
+                <td><input type="number" value="${received}" class="border border-black p-1 text-xs w-full received-input" placeholder="0" oninput="calculateBalances(); saveDataToStorage();"></td>
+                <td><input type="number" value="${used}" class="border border-black p-1 text-xs w-full used-input" placeholder="0" oninput="calculateBalances(); saveDataToStorage();"></td>
+                <td><span class="balance-display font-semibold text-xs">${balance !== '' ? balance : '0'}</span></td>
+                <td><input type="text" value="${remarks}" class="border border-black p-1 text-xs w-full remarks-input" placeholder="Reason/Where spent" oninput="saveDataToStorage()"></td>
+                <td class="text-center"><button onclick="deleteRow(this)" class="text-red-600 font-bold text-xs hover:underline">Delete</button></td>
+            `;
+
+            tbody.appendChild(row);
+            calculateBalances();
+            saveDataToStorage();
+        }
+
+        function handleTypeChange(selectElement) {
+            const parentTd = selectElement.parentElement;
+            const detailContainer = parentTd.querySelector('.detail-container');
+            if (selectElement.value === 'Other') {
+                detailContainer.classList.remove('hidden');
+            } else {
+                detailContainer.classList.add('hidden');
+                detailContainer.querySelector('.detail-input').value = '';
+            }
+            saveDataToStorage();
+        }
+
+        function deleteRow(btn) {
+            const row = btn.closest('tr');
+            row.remove();
+            calculateBalances();
+            saveDataToStorage();
+        }
+
+        function calculateBalances() {
+            const rows = document.querySelectorAll('#tableBody tr');
+            let runningBalance = 0;
+
+            rows.forEach((row, index) => {
+                const receivedInput = row.querySelector('.received-input');
+                const usedInput = row.querySelector('.used-input');
+                const balanceDisplay = row.querySelector('.balance-display');
+
+                let received = parseFloat(receivedInput.value) || 0;
+                let used = parseFloat(usedInput.value) || 0;
+
+                if (index === 0) {
+                    runningBalance = received - used;
+                } else {
+                    runningBalance = runningBalance + received - used;
+                }
+
+                balanceDisplay.textContent = runningBalance;
+            });
+        }
+
+        function saveDataToStorage() {
+            const rows = document.querySelectorAll('#tableBody tr');
+            const dataToSave = [];
+
+            rows.forEach(row => {
+                const dateTime = row.cells[0].innerText;
+                const amountType = row.querySelector('.amount-type-select').value;
+                const detailText = row.querySelector('.detail-input') ? row.querySelector('.detail-input').value : '';
+                const received = row.querySelector('.received-input').value;
+                const used = row.querySelector('.used-input').value;
+                const balance = row.querySelector('.balance-display').innerText;
+                const remarks = row.querySelector('.remarks-input').value;
+
+                dataToSave.path = true; // placeholder check
+                dataToSave.push({
+                    dateTime,
+                    amountType,
+                    detailText,
+                    received,
+                    used,
+                    balance,
+                    remarks
+                });
+            });
+
+            localStorage.setItem(getStorageKey(), JSON.stringify(dataToSave));
+        }
+
+        function loadTableData() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = ''; // Clear current rows
+
+            const savedData = JSON.parse(localStorage.getItem(getStorageKey()));
+            if (savedData && savedData.length > 0) {
+                savedData.forEach(item => {
+                    createNewRow(item);
+                });
+            }
+            calculateBalances();
+        }
+
+        function filterData() {
+            loadTableData();
+        }
+    </script>
+</body>
+</html>
