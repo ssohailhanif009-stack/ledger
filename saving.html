@@ -135,7 +135,6 @@
             const yearSelect = document.getElementById('yearFilter');
             const currentSelectedYear = yearSelect.value;
             
-            // Sirf wohi saal extract karna jo applicationData mein maujood hain
             let yearsSet = new Set();
             applicationData.forEach(item => {
                 if (item.dateTime) {
@@ -150,7 +149,7 @@
             });
 
             let years = Array.from(yearsSet);
-            years.sort((a, b) => a - b); // Ascending order
+            years.sort((a, b) => a - b);
 
             yearSelect.innerHTML = '<option value="ALL">All Years</option>';
             years.forEach(y => {
@@ -168,7 +167,7 @@
         }
 
         function calculateGlobalBalances() {
-            // Data ko chronological order mein sort karna taake balance shuru se akhir tak theek bane
+            // Data ko hamesha chronological order mein sort karna taake balance aur sorting theek rahe
             applicationData.sort((a, b) => {
                 let timeA = convertToTimestamp(a.dateTime);
                 let timeB = convertToTimestamp(b.dateTime);
@@ -222,17 +221,9 @@
         }
 
         async function addNewRowToFirebase() {
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            
-            const defaultDateTime = `${day}-${month}-${year} ${hours}:${minutes}:00`;
-
+            // Nayi row mein default date/time bilkul khali rakhi hai taake user khud select kare
             const newEntry = {
-                dateTime: defaultDateTime,
+                dateTime: "",
                 amountType: "",
                 detailText: "",
                 received: "",
@@ -329,7 +320,6 @@
         }
 
         function handleInputChange() {
-            // Live update balances across all data and refresh UI views & Firebase updates
             syncTableToApplicationData();
             calculateGlobalBalances();
             updateAllDisplayedBalances();
@@ -423,9 +413,10 @@
                 applicationData[index].remarks = remarks;
             }
 
+            // Data update hone par dobara sort aur calculate kar ke table reload karna taake row apni sahi date ki jagah par chali jaye
             calculateGlobalBalances();
             populateYearFilterOptions();
-            updateAllDisplayedBalances();
+            loadTableData();
 
             try {
                 if (id) {
@@ -460,8 +451,19 @@
             const selectedMonth = document.getElementById('monthFilter').value;
             const selectedYear = document.getElementById('yearFilter').value;
 
+            // Sorting ensure karne ke baad render karna
+            applicationData.sort((a, b) => {
+                let timeA = convertToTimestamp(a.dateTime);
+                let timeB = convertToTimestamp(b.dateTime);
+                return timeA - timeB;
+            });
+
             applicationData.forEach(item => {
-                if (!item.dateTime) return;
+                if (!item.dateTime) {
+                    // Agar date select nahi ki hui tou usko bhi table mein dikhana taake user date daal sake
+                    createRowElement(item);
+                    return;
+                }
 
                 let datePart = item.dateTime.split(' ')[0]; 
                 if (datePart.includes('-')) {
