@@ -139,16 +139,16 @@
             <form id="personalDataForm" class="space-y-2.5" onsubmit="event.preventDefault();">
                 <div>
                     <label class="block font-medium text-slate-700 mb-0.5">Full Name</label>
-                    <input type="text" id="pdFullName" oninput="updatePersonalDataField('fullName', this.value)" class="w-full border rounded px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-blue-500" placeholder="Full name">
+                    <input type="text" id="pdFullName" onblur="updatePersonalDataField('fullName', this.value)" class="w-full border rounded px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-blue-500" placeholder="Full name">
                 </div>
                 <div>
                     <label class="block font-medium text-slate-700 mb-0.5">Address</label>
-                    <input type="text" id="pdAddress" oninput="updatePersonalDataField('address', this.value)" class="w-full border rounded px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-blue-500" placeholder="Address">
+                    <input type="text" id="pdAddress" onblur="updatePersonalDataField('address', this.value)" class="w-full border rounded px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-blue-500" placeholder="Address">
                 </div>
                 <div class="flex items-center gap-2">
                     <div class="flex-1">
                         <label class="block font-medium text-slate-700 mb-0.5">Mobile No.</label>
-                        <input type="text" id="pdMobile" oninput="validateMobileNumber(this.value)" class="w-full border rounded px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-blue-500" placeholder="Only numbers">
+                        <input type="text" id="pdMobile" onblur="validateMobileNumber(this.value)" class="w-full border rounded px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-blue-500" placeholder="Only numbers">
                     </div>
                     <div class="flex items-center pt-4">
                         <label class="flex items-center gap-1 cursor-pointer">
@@ -158,7 +158,7 @@
                 </div>
                 <div>
                     <label class="block font-medium text-slate-700 mb-0.5">Reason for borrowing money detail</label>
-                    <textarea id="pdReason" rows="2" oninput="updatePersonalDataField('reason', this.value)" class="w-full border rounded px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-blue-500" placeholder="Detail reason..."></textarea>
+                    <textarea id="pdReason" rows="2" onblur="updatePersonalDataField('reason', this.value)" class="w-full border rounded px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-blue-500" placeholder="Detail reason..."></textarea>
                 </div>
                 <div>
                     <label class="block font-medium text-slate-700 mb-0.5">Picture (Gallery Only)</label>
@@ -229,9 +229,12 @@
 
         let ledgers = [];
         let activeLedgerId = null;
+        let isLocalTyping = false; // Flag to prevent external snapshot overwrite while typing
 
         // Firebase Firestore Listener (Realtime Data Fetching)
         onSnapshot(collection(db, "ledgers"), (snapshot) => {
+            if (isLocalTyping) return; // Skip updating UI if user is actively typing/editing
+            
             ledgers = [];
             snapshot.forEach((docSnap) => {
                 ledgers.push(docSnap.data());
@@ -240,7 +243,7 @@
             if (activeLedgerId) {
                 const activeExists = ledgers.some(l => l.id === activeLedgerId);
                 if (activeExists) {
-                    selectLedgerFromDropdown(activeLedgerId);
+                    selectLedgerFromDropdown(activeLedgerId, true);
                 } else {
                     selectLedgerFromDropdown('');
                 }
@@ -280,7 +283,7 @@
             });
         };
 
-        window.selectLedgerFromDropdown = function(id) {
+        window.selectLedgerFromDropdown = function(id, preserveCursor = false) {
             const removeBtn = document.getElementById('removeLedgerBtn');
             const personalDataBtn = document.getElementById('personalDataBtn');
             
@@ -310,12 +313,12 @@
             document.getElementById('viewLedgerPurpose').innerText = ledger.purpose;
 
             calculateRunningBalances(ledger);
-            renderTransactions();
+            renderTransactions(preserveCursor);
         };
 
         window.removeActiveLedger = async function() {
             if (!activeLedgerId) return;
-            if (confirm('Kya aap waqai is ledger ko delete karna chahte hain?')) {
+            if (confirm('Kya aap waqai is ledger ko delete کرنا chahte hain?')) {
                 const idToDelete = activeLedgerId;
                 activeLedgerId = null;
                 await deleteLedgerFromFirebase(idToDelete);
@@ -392,6 +395,7 @@
         };
 
         window.updatePersonalDataField = function(field, value) {
+            isLocalTyping = false;
             const ledger = ledgers.find(l => l.id === activeLedgerId);
             if (!ledger) return;
             if (!ledger.personalData) ledger.personalData = {};
@@ -400,6 +404,7 @@
         };
 
         window.validateMobileNumber = function(value) {
+            isLocalTyping = false;
             const cleanVal = value.replace(/[^0-9]/g, '');
             document.getElementById('pdMobile').value = cleanVal;
             updatePersonalDataField('mobile', cleanVal);
@@ -686,35 +691,36 @@
             return dateStr;
         }
 
-        function renderTransactions() {
+        function renderTransactions(preserveCursor = false) {
             const ledger = ledgers.find(l => l.id === activeLedgerId);
             const tbody = document.getElementById('transactionTableBody');
-            tbody.innerHTML = '';
-
+            
             if (!ledger || !ledger.transactions || ledger.transactions.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-slate-400">No records found. Click "Create New Row" to add entries.</td></tr>`;
                 return;
             }
+
+            tbody.innerHTML = '';
 
             ledger.transactions.forEach((tx) => {
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-slate-50 transition";
                 
                 const detailInputHtml = tx.remarkType ? `
-                    <input type="text" value="${tx.remarkDetail}" oninput="updateTxField('${tx.id}', 'remarkDetail', this.value)" placeholder="${getRemarkPlaceholder(tx.remarkType)}" class="w-full border border-slate-300 rounded px-2 py-1 text-[11px] outline-none focus:ring-1 focus:ring-blue-500 mt-1">
+                    <input type="text" value="${tx.remarkDetail || ''}" onfocus="isLocalTyping=true" onblur="updateTxField('${tx.id}', 'remarkDetail', this.value)" placeholder="${getRemarkPlaceholder(tx.remarkType)}" class="w-full border border-slate-300 rounded px-2 py-1 text-[11px] outline-none focus:ring-1 focus:ring-blue-500 mt-1">
                 ` : '';
 
                 const dateOnly = extractDateOnly(tx.date);
                 const pickerDateValue = convertToYYYYMMDD(dateOnly);
 
                 tr.innerHTML = `
-                    <td class="p-1.5"><input type="text" value="${tx.title}" oninput="updateTxField('${tx.id}', 'title', this.value)" class="w-full border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 min-w-[120px]" placeholder="Title/Purpose"></td>
+                    <td class="p-1.5"><input type="text" value="${tx.title || ''}" onfocus="isLocalTyping=true" onblur="updateTxField('${tx.id}', 'title', this.value)" class="w-full border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 min-w-[120px]" placeholder="Title/Purpose"></td>
                     <td class="p-1.5">
                         <input type="date" value="${pickerDateValue}" onchange="updateDateValue('${tx.id}', this.value)" class="border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 min-w-[120px]" title="Select Date">
                         <div class="text-[10px] text-slate-500 mt-0.5">${tx.date}</div>
                     </td>
-                    <td class="p-1.5"><input type="number" value="${tx.amount}" ${tx.amountLocked ? 'readonly class="w-20 border border-slate-300 bg-slate-100 rounded px-2 py-1 text-xs outline-none"' : 'oninput="updateTxField(\''+tx.id+'\', \'amount\', this.value)" onblur="lockFieldOnBlur(\''+tx.id+'\', \'amount\', this.value)" class="w-20 border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"'} ></td>
-                    <td class="p-1.5"><input type="number" value="${tx.paid}" ${tx.paidLocked ? 'readonly class="w-20 border border-slate-300 bg-slate-100 rounded px-2 py-1 text-xs outline-none"' : 'oninput="updateTxField(\''+tx.id+'\', \'paid\', this.value)" onblur="lockFieldOnBlur(\''+tx.id+'\', \'paid\', this.value)" class="w-20 border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"'} ></td>
+                    <td class="p-1.5"><input type="number" value="${tx.amount}" ${tx.amountLocked ? 'readonly class="w-20 border border-slate-300 bg-slate-100 rounded px-2 py-1 text-xs outline-none"' : 'onfocus="isLocalTyping=true" onblur="lockFieldOnBlur(\''+tx.id+'\', \'amount\', this.value)" class="w-20 border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"'} ></td>
+                    <td class="p-1.5"><input type="number" value="${tx.paid}" ${tx.paidLocked ? 'readonly class="w-20 border border-slate-300 bg-slate-100 rounded px-2 py-1 text-xs outline-none"' : 'onfocus="isLocalTyping=true" onblur="lockFieldOnBlur(\''+tx.id+'\', \'paid\', this.value)" class="w-20 border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"'} ></td>
                     <td class="p-1.5 font-bold text-slate-700 bg-slate-50 whitespace-nowrap" id="bal_${tx.id}">${tx.balance}</td>
                     <td class="p-1.5 min-w-[140px]">
                         <select onchange="updateRemarkType('${tx.id}', this.value)" class="border border-slate-300 rounded px-2 py-1 text-[11px] outline-none bg-white w-full">
@@ -748,6 +754,7 @@
         }
 
         window.updateRemarkType = function(txId, type) {
+            isLocalTyping = false;
             updateTxField(txId, 'remarkType', type);
             if (!type) {
                 updateTxField(txId, 'remarkDetail', '');
@@ -756,6 +763,7 @@
         };
 
         window.updateDateValue = function(txId, val) {
+            isLocalTyping = false;
             const formattedDateOnly = convertToDDMMYYYY(val);
             const ledger = ledgers.find(l => l.id === activeLedgerId);
             if (!ledger) return;
@@ -769,6 +777,7 @@
         };
 
         window.updateTxField = function(txId, field, value) {
+            isLocalTyping = false;
             const ledger = ledgers.find(l => l.id === activeLedgerId);
             if (!ledger) return;
             const tx = ledger.transactions.find(t => t.id === txId);
@@ -786,6 +795,8 @@
         };
 
         window.lockFieldOnBlur = function(txId, field, value) {
+            isLocalTyping = false;
+            updateTxField(txId, field, value);
             if (value !== '' && value !== '0' && value !== 0) {
                 const ledger = ledgers.find(l => l.id === activeLedgerId);
                 if (!ledger) return;
