@@ -17,9 +17,9 @@
         }
         table.ms-word-table th, table.ms-word-table td {
             border: 1px solid #1e3a8a;
-            padding: 6px 8px;
+            padding: 8px 10px;
             text-align: left;
-            white-space: nowrap; /* Mobile par data ke mutabiq column expand hone ke liye */
+            /* white-space khatam kar diya gaya hai taake mobile par data ke mutabiq column expand ho sake */
         }
         table.ms-word-table th {
             background-color: #1e3a8a;
@@ -29,7 +29,7 @@
         }
     </style>
 </head>
-<body class="bg-white text-gray-900 p-6">
+<body class="bg-white text-gray-900 p-4 md:p-6">
 
     <div class="max-w-7xl mx-auto">
         <!-- Main Heading with Navy Blue Shade -->
@@ -52,18 +52,18 @@
             </div>
         </div>
 
-        <!-- Line List Table -->
+        <!-- Line List Table with horizontal scroll support for mobile -->
         <div class="overflow-x-auto shadow-sm rounded border border-blue-900">
             <table class="ms-word-table" id="savingTable">
                 <thead>
                     <tr>
-                        <th>Date and Time</th>
-                        <th>Amount Type</th>
-                        <th>Amount Received</th>
-                        <th>Used</th>
-                        <th>Balance</th>
-                        <th>Remarks</th>
-                        <th class="text-center">Action</th>
+                        <th style="min-width: 180px;">Date and Time</th>
+                        <th style="min-width: 140px;">Amount Type</th>
+                        <th style="min-width: 120px;">Amount Received</th>
+                        <th style="min-width: 120px;">Used</th>
+                        <th style="min-width: 100px;">Balance</th>
+                        <th style="min-width: 180px;">Remarks</th>
+                        <th class="text-center" style="min-width: 80px;">Action</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
@@ -97,7 +97,15 @@
         let applicationData = [];
 
         window.addEventListener('DOMContentLoaded', () => {
+            // LocalStorage se saved filter load karna
+            const savedFilter = localStorage.getItem('selectedMonthYearFilter');
             populateMonthFilterOptions();
+            
+            if (savedFilter) {
+                const filterSelect = document.getElementById('monthYearFilter');
+                filterSelect.value = savedFilter;
+            }
+            
             loadTableData();
         });
 
@@ -114,17 +122,16 @@
                     if (parts.includes('-')) {
                         let subParts = parts.split('-');
                         if (subParts.length === 3) {
-                            // Format: DD-MM-YYYY -> YYYY-MM for sorting and grouping
                             uniqueMonths.add(`${subParts[2]}-${subParts[1]}`);
                         }
                     }
                 }
             });
 
-            // Pure life tak ke liye pichle 10 saal se lekar agle 10 saal tak ke options generate karna
+            // All life time (pichle 15 saal se agle 15 saal tak ke options January to December)
             const now = new Date();
             const currentYear = now.getFullYear();
-            for (let y = currentYear - 10; y <= currentYear + 10; y++) {
+            for (let y = currentYear - 15; y <= currentYear + 15; y++) {
                 for (let m = 1; m <= 12; m++) {
                     let monthStr = String(m).padStart(2, '0');
                     uniqueMonths.add(`${y}-${monthStr}`);
@@ -133,8 +140,15 @@
 
             const sortedMonths = Array.from(uniqueMonths).sort().reverse();
             sortedMonths.forEach(m => {
-                let parts = m.split('-');
-                let displayLabel = `${parts[1]}-${parts[0]}`; // MM-YYYY format for dropdown view
+                let parts = m.split('-'); // YYYY-MM
+                let year = parts[0];
+                let monthNum = parseInt(parts[1], 10);
+                
+                // Month names mapping
+                const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+                let monthName = monthNames[monthNum - 1];
+                let displayLabel = `${monthName} ${year}`;
+
                 const opt = document.createElement('option');
                 opt.value = m;
                 opt.textContent = displayLabel;
@@ -150,28 +164,35 @@
             const tbody = document.getElementById('tableBody');
             const row = document.createElement('tr');
 
-            let dateVal = "";
-            let timeVal = "";
+            let dateTimeVal = "";
             
             if (savedData && savedData.dateTime) {
+                // savedData.dateTime format: DD-MM-YYYY HH:mm ya YYYY-MM-DDTHH:mm
                 let dtParts = savedData.dateTime.split(' ');
-                let dmy = dtParts[0]; // DD-MM-YYYY
+                let dmy = dtParts[0]; 
+                let timePart = dtParts[1] || "00:00";
+                
                 if (dmy && dmy.includes('-')) {
                     let p = dmy.split('-');
                     if (p.length === 3) {
-                        dateVal = `${p[2]}-${p[1]}-${p[0]}`; // YYYY-MM-DD for input element
+                        // Check if format is DD-MM-YYYY or YYYY-MM-DD
+                        if (p[0].length === 4) {
+                            dateTimeVal = `${p[0]}-${p[1]}-${p[2]}T${timePart.substring(0,5)}`;
+                        } else {
+                            dateTimeVal = `${p[2]}-${p[1]}-${p[0]}T${timePart.substring(0,5)}`;
+                        }
                     }
                 }
-                timeVal = dtParts[1] || "";
             }
             
-            if (!dateVal) {
+            if (!dateTimeVal) {
                 const now = new Date();
-                const day = String(now.getDate()).padStart(2, '0');
-                const month = String(now.getMonth() + 1).padStart(2, '0');
                 const year = now.getFullYear();
-                dateVal = `${year}-${month}-${day}`;
-                timeVal = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                dateTimeVal = `${year}-${month}-${day}T${hours}:${minutes}`;
             }
 
             const amountType = savedData ? savedData.amountType : '';
@@ -186,10 +207,7 @@
 
             row.innerHTML = `
                 <td>
-                    <div class="flex items-center gap-1">
-                        <input type="date" value="${dateVal}" class="border border-blue-900 p-1 text-xs date-input rounded" onchange="saveDataToMemory()">
-                        <input type="time" step="1" value="${timeVal}" class="border border-blue-900 p-1 text-xs time-input rounded" onchange="saveDataToMemory()">
-                    </div>
+                    <input type="datetime-local" value="${dateTimeVal}" class="border border-blue-900 p-1 text-xs w-full datetime-input rounded" onchange="saveDataToMemory()">
                 </td>
                 <td>
                     <select class="border border-blue-900 p-1 text-xs w-full amount-type-select rounded" onchange="handleTypeChange(this)">
@@ -268,20 +286,23 @@
             applicationData = [];
 
             rows.forEach(row => {
-                const dateInput = row.querySelector('.date-input');
-                const timeInput = row.querySelector('.time-input');
-                let rawDate = dateInput ? dateInput.value : '';
-                let rawTime = timeInput ? timeInput.value : '00:00:00';
-                
-                // Format display as DD/MM/YYYY
-                let formattedDate = rawDate;
-                if (rawDate && rawDate.includes('-')) {
-                    let parts = rawDate.split('-');
-                    if (parts.length === 3) {
-                        formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                const datetimeInput = row.querySelector('.datetime-input');
+                let rawVal = datetimeInput ? datetimeInput.value : '';
+                let dateTime = '';
+
+                if (rawVal) {
+                    // rawVal format from datetime-local is YYYY-MM-DDTHH:mm
+                    let parts = rawVal.split('T');
+                    let datePart = parts[0]; // YYYY-MM-DD
+                    let timePart = (parts[1] || '00:00') + ':00';
+                    
+                    if (datePart && datePart.includes('-')) {
+                        let dp = datePart.split('-');
+                        if (dp.length === 3) {
+                            dateTime = `${dp[2]}-${dp[1]}-${dp[0]} ${timePart}`;
+                        }
                     }
                 }
-                const dateTime = `${formattedDate} ${rawTime}`;
 
                 const amountTypeSelect = row.querySelector('.amount-type-select');
                 const amountType = amountTypeSelect ? amountTypeSelect.value : '';
@@ -311,7 +332,6 @@
         }
 
         function populateMonthYearFilterDropdownOnly() {
-            // Dropdown selection state ko maintain rakhte hue options refresh karna
             const filterSelect = document.getElementById('monthYearFilter');
             const currentSelected = filterSelect.value;
             
@@ -319,8 +339,8 @@
             applicationData.forEach(item => {
                 if (item.dateTime) {
                     let parts = item.dateTime.split(' ')[0];
-                    if (parts.includes('/')) {
-                        let subParts = parts.split('/');
+                    if (parts.includes('-')) {
+                        let subParts = parts.split('-');
                         if (subParts.length === 3) {
                             uniqueMonths.add(`${subParts[2]}-${subParts[1]}`);
                         }
@@ -330,7 +350,7 @@
 
             const now = new Date();
             const currentYear = now.getFullYear();
-            for (let y = currentYear - 10; y <= currentYear + 10; y++) {
+            for (let y = currentYear - 15; y <= currentYear + 15; y++) {
                 for (let m = 1; m <= 12; m++) {
                     let monthStr = String(m).padStart(2, '0');
                     uniqueMonths.add(`${y}-${monthStr}`);
@@ -341,7 +361,13 @@
             const sortedMonths = Array.from(uniqueMonths).sort().reverse();
             sortedMonths.forEach(m => {
                 let parts = m.split('-');
-                let displayLabel = `${parts[1]}-${parts[0]}`;
+                let year = parts[0];
+                let monthNum = parseInt(parts[1], 10);
+                
+                const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+                let monthName = monthNames[monthNum - 1];
+                let displayLabel = `${monthName} ${year}`;
+
                 const opt = document.createElement('option');
                 opt.value = m;
                 opt.textContent = displayLabel;
@@ -364,9 +390,9 @@
                     createNewRow(item);
                 } else {
                     if (item.dateTime) {
-                        let datePart = item.dateTime.split(' ')[0]; // DD/MM/YYYY
-                        if (datePart.includes('/')) {
-                            let parts = datePart.split('/');
+                        let datePart = item.dateTime.split(' ')[0]; // DD-MM-YYYY
+                        if (datePart.includes('-')) {
+                            let parts = datePart.split('-');
                             if (parts.length === 3) {
                                 let itemMonthYear = `${parts[2]}-${parts[1]}`; // YYYY-MM
                                 if (itemMonthYear === filterVal) {
@@ -381,6 +407,9 @@
         }
 
         function filterData() {
+            const filterSelect = document.getElementById('monthYearFilter');
+            // Selected filter ko localStorage mein save karna taake refresh ke baad bhi yaad rahe
+            localStorage.setItem('selectedMonthYearFilter', filterSelect.value);
             loadTableData();
         }
     </script>
