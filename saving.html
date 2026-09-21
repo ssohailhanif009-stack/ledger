@@ -19,7 +19,6 @@
             border: 1px solid #1e3a8a;
             padding: 8px 10px;
             text-align: left;
-            /* white-space khatam kar diya gaya hai taake mobile par data ke mutabiq column expand ho sake */
         }
         table.ms-word-table th {
             background-color: #1e3a8a;
@@ -37,16 +36,40 @@
             Comprehensive Personal Financial Saving & Expense Management System
         </h1>
 
-        <!-- Top Controls: Filter & Actions -->
+        <!-- Top Controls: Separate Month & Year Filters & Actions -->
         <div class="flex flex-wrap items-center justify-between gap-4 mb-4 bg-blue-50 p-3 border border-blue-900 rounded">
-            <div class="flex items-center gap-2">
-                <label for="monthYearFilter" class="font-bold text-xs uppercase text-blue-900">Filter By Month & Year:</label>
-                <select id="monthYearFilter" class="border border-blue-900 px-2 py-1 text-xs bg-white rounded" onchange="filterData()">
-                    <option value="ALL">All Months</option>
-                </select>
+            <div class="flex flex-wrap items-center gap-3">
+                <!-- Month Filter -->
+                <div class="flex items-center gap-1">
+                    <label for="monthFilter" class="font-bold text-xs uppercase text-blue-900">Month:</label>
+                    <select id="monthFilter" class="border border-blue-900 px-2 py-1 text-xs bg-white rounded" onchange="filterData()">
+                        <option value="ALL">All Months</option>
+                        <option value="01">January</option>
+                        <option value="02">February</option>
+                        <option value="03">March</option>
+                        <option value="04">April</option>
+                        <option value="05">May</option>
+                        <option value="06">June</option>
+                        <option value="07">July</option>
+                        <option value="08">August</option>
+                        <option value="09">September</option>
+                        <option value="10">October</option>
+                        <option value="11">November</option>
+                        <option value="12">December</option>
+                    </select>
+                </div>
+
+                <!-- Year Filter -->
+                <div class="flex items-center gap-1">
+                    <label for="yearFilter" class="font-bold text-xs uppercase text-blue-900">Year:</label>
+                    <select id="yearFilter" class="border border-blue-900 px-2 py-1 text-xs bg-white rounded" onchange="filterData()">
+                        <option value="ALL">All Years</option>
+                    </select>
+                </div>
             </div>
+
             <div>
-                <button onclick="createNewRow()" class="bg-blue-900 text-white px-4 py-1 text-xs uppercase font-semibold rounded hover:bg-blue-800">
+                <button onclick="addNewRowToFirebase()" class="bg-blue-900 text-white px-4 py-1 text-xs uppercase font-semibold rounded hover:bg-blue-800">
                     Create New Row
                 </button>
             </div>
@@ -73,10 +96,10 @@
         </div>
     </div>
 
-    <!-- Firebase SDK Integration -->
+    <!-- Firebase SDK Integration & Firestore setup -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
-        import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-analytics.js";
+        import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBNDifUQOSYt_nQSeL_ZIxXhfNzTGQJGdA",
@@ -89,125 +112,133 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const analytics = getAnalytics(app);
-        window.firebaseApp = app;
+        const db = getFirestore(app);
+
+        window.db = db;
+        window.collection = collection;
+        window.getDocs = getDocs;
+        window.addDoc = addDoc;
+        window.updateDoc = updateDoc;
+        window.deleteDoc = deleteDoc;
+        window.doc = doc;
+
+        // Page load hone par Firebase se data fetch karna
+        window.addEventListener('DOMContentLoaded', () => {
+            populateYearFilterOptions();
+            fetchDataFromFirebase();
+        });
     </script>
 
     <script>
         let applicationData = [];
 
-        window.addEventListener('DOMContentLoaded', () => {
-            // LocalStorage se saved filter load karna
-            const savedFilter = localStorage.getItem('selectedMonthYearFilter');
-            populateMonthFilterOptions();
+        function populateYearFilterOptions() {
+            const yearSelect = document.getElementById('yearFilter');
+            const currentSelectedYear = yearSelect.value;
             
-            if (savedFilter) {
-                const filterSelect = document.getElementById('monthYearFilter');
-                filterSelect.value = savedFilter;
-            }
+            yearSelect.innerHTML = '<option value="ALL">All Years</option>';
             
-            loadTableData();
-        });
-
-        function populateMonthFilterOptions() {
-            const filterSelect = document.getElementById('monthYearFilter');
-            const currentSelected = filterSelect.value;
-            
-            filterSelect.innerHTML = '<option value="ALL">All Months</option>';
-            
-            let uniqueMonths = new Set();
-            applicationData.forEach(item => {
-                if (item.dateTime) {
-                    let parts = item.dateTime.split(' ')[0];
-                    if (parts.includes('-')) {
-                        let subParts = parts.split('-');
-                        if (subParts.length === 3) {
-                            uniqueMonths.add(`${subParts[2]}-${subParts[1]}`);
-                        }
-                    }
-                }
-            });
-
-            // All life time (pichle 15 saal se agle 15 saal tak ke options January to December)
             const now = new Date();
             const currentYear = now.getFullYear();
+            
+            // Lifetime years (pichle 15 saal se agle 15 saal tak)
+            let years = [];
             for (let y = currentYear - 15; y <= currentYear + 15; y++) {
-                for (let m = 1; m <= 12; m++) {
-                    let monthStr = String(m).padStart(2, '0');
-                    uniqueMonths.add(`${y}-${monthStr}`);
-                }
+                years.push(y);
             }
 
-            const sortedMonths = Array.from(uniqueMonths).sort().reverse();
-            sortedMonths.forEach(m => {
-                let parts = m.split('-'); // YYYY-MM
-                let year = parts[0];
-                let monthNum = parseInt(parts[1], 10);
-                
-                // Month names mapping
-                const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-                let monthName = monthNames[monthNum - 1];
-                let displayLabel = `${monthName} ${year}`;
-
+            years.sort((a, b) => b - a).forEach(y => {
                 const opt = document.createElement('option');
-                opt.value = m;
-                opt.textContent = displayLabel;
-                filterSelect.appendChild(opt);
+                opt.value = y;
+                opt.textContent = y;
+                yearSelect.appendChild(opt);
             });
 
-            if (currentSelected) {
-                filterSelect.value = currentSelected;
+            if (currentSelectedYear) {
+                yearSelect.value = currentSelectedYear;
             }
         }
 
-        function createNewRow(savedData = null) {
+        async function fetchDataFromFirebase() {
+            try {
+                const querySnapshot = await window.getDocs(window.collection(window.db, "savingsData"));
+                applicationData = [];
+                querySnapshot.forEach((docSnap) => {
+                    applicationData.push({
+                        id: docSnap.id,
+                        ...docSnap.data()
+                    });
+                });
+                // Date ke lihaz se sort karna
+                applicationData.sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
+                loadTableData();
+            } catch (error) {
+                console.error("Error fetching data from Firebase: ", error);
+            }
+        }
+
+        async function addNewRowToFirebase() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            
+            const defaultDateTime = `${day}-${month}-${year} ${hours}:${minutes}:00`;
+
+            const newEntry = {
+                dateTime: defaultDateTime,
+                amountType: "",
+                detailText: "",
+                received: "",
+                used: "",
+                balance: "0",
+                remarks: ""
+            };
+
+            try {
+                const docRef = await window.addDoc(window.collection(window.db, "savingsData"), newEntry);
+                newEntry.id = docRef.id;
+                applicationData.unshift(newEntry);
+                loadTableData();
+            } catch (error) {
+                console.error("Error adding document: ", error);
+            }
+        }
+
+        function createRowElement(item) {
             const tbody = document.getElementById('tableBody');
             const row = document.createElement('tr');
+            row.setAttribute('data-id', item.id);
 
             let dateTimeVal = "";
-            
-            if (savedData && savedData.dateTime) {
-                // savedData.dateTime format: DD-MM-YYYY HH:mm ya YYYY-MM-DDTHH:mm
-                let dtParts = savedData.dateTime.split(' ');
+            if (item.dateTime) {
+                let dtParts = item.dateTime.split(' ');
                 let dmy = dtParts[0]; 
                 let timePart = dtParts[1] || "00:00";
                 
                 if (dmy && dmy.includes('-')) {
                     let p = dmy.split('-');
                     if (p.length === 3) {
-                        // Check if format is DD-MM-YYYY or YYYY-MM-DD
-                        if (p[0].length === 4) {
-                            dateTimeVal = `${p[0]}-${p[1]}-${p[2]}T${timePart.substring(0,5)}`;
-                        } else {
-                            dateTimeVal = `${p[2]}-${p[1]}-${p[0]}T${timePart.substring(0,5)}`;
-                        }
+                        dateTimeVal = `${p[2]}-${p[1]}-${p[0]}T${timePart.substring(0,5)}`;
                     }
                 }
             }
-            
-            if (!dateTimeVal) {
-                const now = new Date();
-                const year = now.getFullYear();
-                const month = String(now.getMonth() + 1).padStart(2, '0');
-                const day = String(now.getDate()).padStart(2, '0');
-                const hours = String(now.getHours()).padStart(2, '0');
-                const minutes = String(now.getMinutes()).padStart(2, '0');
-                dateTimeVal = `${year}-${month}-${day}T${hours}:${minutes}`;
-            }
 
-            const amountType = savedData ? savedData.amountType : '';
-            const detailText = savedData ? savedData.detailText : '';
-            const received = savedData ? savedData.received : '';
-            const used = savedData ? savedData.used : '';
-            const balance = savedData ? savedData.balance : '';
-            const remarks = savedData ? savedData.remarks : '';
+            const amountType = item.amountType || '';
+            const detailText = item.detailText || '';
+            const received = item.received || '';
+            const used = item.used || '';
+            const balance = item.balance || '0';
+            const remarks = item.remarks || '';
             
             const receivedLocked = received !== '' ? 'readonly bg-gray-100' : '';
             const usedLocked = used !== '' ? 'readonly bg-gray-100' : '';
 
             row.innerHTML = `
                 <td>
-                    <input type="datetime-local" value="${dateTimeVal}" class="border border-blue-900 p-1 text-xs w-full datetime-input rounded" onchange="saveDataToMemory()">
+                    <input type="datetime-local" value="${dateTimeVal}" class="border border-blue-900 p-1 text-xs w-full datetime-input rounded" onchange="updateRowData(this)">
                 </td>
                 <td>
                     <select class="border border-blue-900 p-1 text-xs w-full amount-type-select rounded" onchange="handleTypeChange(this)">
@@ -217,19 +248,17 @@
                         <option value="Other" ${amountType === 'Other' ? 'selected' : ''}>Other</option>
                     </select>
                     <div class="detail-container mt-1 ${amountType === 'Other' ? '' : 'hidden'}">
-                        <input type="text" placeholder="Enter Detail" value="${detailText}" class="border border-blue-900 p-1 text-xs w-full detail-input rounded" oninput="saveDataToMemory()">
+                        <input type="text" placeholder="Enter Detail" value="${detailText}" class="border border-blue-900 p-1 text-xs w-full detail-input rounded" oninput="updateRowData(this)">
                     </div>
                 </td>
-                <td><input type="number" value="${received}" ${receivedLocked} class="border border-blue-900 p-1 text-xs w-full received-input rounded" placeholder="0" onblur="lockInput(this)" oninput="calculateBalances(); saveDataToMemory();"></td>
-                <td><input type="number" value="${used}" ${usedLocked} class="border border-blue-900 p-1 text-xs w-full used-input rounded" placeholder="0" onblur="lockInput(this)" oninput="calculateBalances(); saveDataToMemory();"></td>
-                <td><span class="balance-display font-semibold text-xs">${balance !== '' ? balance : '0'}</span></td>
-                <td><input type="text" value="${remarks}" class="border border-blue-900 p-1 text-xs w-full remarks-input rounded" placeholder="Reason/Where spent" oninput="saveDataToMemory()"></td>
-                <td class="text-center"><button onclick="deleteRow(this)" class="text-red-600 font-bold text-xs hover:underline">Delete</button></td>
+                <td><input type="number" value="${received}" ${receivedLocked} class="border border-blue-900 p-1 text-xs w-full received-input rounded" placeholder="0" onblur="lockInput(this); updateRowData(this);" oninput="calculateBalances();"></td>
+                <td><input type="number" value="${used}" ${usedLocked} class="border border-blue-900 p-1 text-xs w-full used-input rounded" placeholder="0" onblur="lockInput(this); updateRowData(this);" oninput="calculateBalances();"></td>
+                <td><span class="balance-display font-semibold text-xs">${balance}</span></td>
+                <td><input type="text" value="${remarks}" class="border border-blue-900 p-1 text-xs w-full remarks-input rounded" placeholder="Reason/Where spent" oninput="updateRowData(this)"></td>
+                <td class="text-center"><button onclick="deleteRowFromFirebase(this)" class="text-red-600 font-bold text-xs hover:underline">Delete</button></td>
             `;
 
             tbody.appendChild(row);
-            calculateBalances();
-            saveDataToMemory();
         }
 
         function handleTypeChange(selectElement) {
@@ -242,7 +271,7 @@
                 const detailInput = detailContainer.querySelector('.detail-input');
                 if(detailInput) detailInput.value = '';
             }
-            saveDataToMemory();
+            updateRowData(selectElement);
         }
 
         function lockInput(input) {
@@ -252,11 +281,20 @@
             }
         }
 
-        function deleteRow(btn) {
+        async function deleteRowFromFirebase(btn) {
             const row = btn.closest('tr');
-            row.remove();
-            calculateBalances();
-            saveDataToMemory();
+            const id = row.getAttribute('data-id');
+
+            try {
+                if (id) {
+                    await window.deleteDoc(window.doc(window.db, "savingsData", id));
+                }
+                row.remove();
+                calculateBalances();
+                fetchDataFromFirebase();
+            } catch (error) {
+                console.error("Error deleting document: ", error);
+            }
         }
 
         function calculateBalances() {
@@ -281,101 +319,64 @@
             });
         }
 
-        function saveDataToMemory() {
-            const rows = document.querySelectorAll('#tableBody tr');
-            applicationData = [];
+        async function updateRowData(element) {
+            const row = element.closest('tr');
+            const id = row.getAttribute('data-id');
 
-            rows.forEach(row => {
-                const datetimeInput = row.querySelector('.datetime-input');
-                let rawVal = datetimeInput ? datetimeInput.value : '';
-                let dateTime = '';
+            const datetimeInput = row.querySelector('.datetime-input');
+            let rawVal = datetimeInput ? datetimeInput.value : '';
+            let dateTime = '';
 
-                if (rawVal) {
-                    // rawVal format from datetime-local is YYYY-MM-DDTHH:mm
-                    let parts = rawVal.split('T');
-                    let datePart = parts[0]; // YYYY-MM-DD
-                    let timePart = (parts[1] || '00:00') + ':00';
-                    
-                    if (datePart && datePart.includes('-')) {
-                        let dp = datePart.split('-');
-                        if (dp.length === 3) {
-                            dateTime = `${dp[2]}-${dp[1]}-${dp[0]} ${timePart}`;
-                        }
+            if (rawVal) {
+                let parts = rawVal.split('T');
+                let datePart = parts[0]; // YYYY-MM-DD
+                let timePart = (parts[1] || '00:00') + ':00';
+                
+                if (datePart && datePart.includes('-')) {
+                    let dp = datePart.split('-');
+                    if (dp.length === 3) {
+                        dateTime = `${dp[2]}-${dp[1]}-${dp[0]} ${timePart}`;
                     }
-                }
-
-                const amountTypeSelect = row.querySelector('.amount-type-select');
-                const amountType = amountTypeSelect ? amountTypeSelect.value : '';
-                const detailInput = row.querySelector('.detail-input');
-                const detailText = detailInput ? detailInput.value : '';
-                const receivedInput = row.querySelector('.received-input');
-                const received = receivedInput ? receivedInput.value : '';
-                const usedInput = row.querySelector('.used-input');
-                const used = usedInput ? usedInput.value : '';
-                const balanceDisplay = row.querySelector('.balance-display');
-                const balance = balanceDisplay ? balanceDisplay.innerText : '';
-                const remarksInput = row.querySelector('.remarks-input');
-                const remarks = remarksInput ? remarksInput.value : '';
-
-                applicationData.push({
-                    dateTime,
-                    amountType,
-                    detailText,
-                    received,
-                    used,
-                    balance,
-                    remarks
-                });
-            });
-
-            populateMonthYearFilterDropdownOnly();
-        }
-
-        function populateMonthYearFilterDropdownOnly() {
-            const filterSelect = document.getElementById('monthYearFilter');
-            const currentSelected = filterSelect.value;
-            
-            let uniqueMonths = new Set();
-            applicationData.forEach(item => {
-                if (item.dateTime) {
-                    let parts = item.dateTime.split(' ')[0];
-                    if (parts.includes('-')) {
-                        let subParts = parts.split('-');
-                        if (subParts.length === 3) {
-                            uniqueMonths.add(`${subParts[2]}-${subParts[1]}`);
-                        }
-                    }
-                }
-            });
-
-            const now = new Date();
-            const currentYear = now.getFullYear();
-            for (let y = currentYear - 15; y <= currentYear + 15; y++) {
-                for (let m = 1; m <= 12; m++) {
-                    let monthStr = String(m).padStart(2, '0');
-                    uniqueMonths.add(`${y}-${monthStr}`);
                 }
             }
 
-            filterSelect.innerHTML = '<option value="ALL">All Months</option>';
-            const sortedMonths = Array.from(uniqueMonths).sort().reverse();
-            sortedMonths.forEach(m => {
-                let parts = m.split('-');
-                let year = parts[0];
-                let monthNum = parseInt(parts[1], 10);
-                
-                const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-                let monthName = monthNames[monthNum - 1];
-                let displayLabel = `${monthName} ${year}`;
+            const amountTypeSelect = row.querySelector('.amount-type-select');
+            const amountType = amountTypeSelect ? amountTypeSelect.value : '';
+            const detailInput = row.querySelector('.detail-input');
+            const detailText = detailInput ? detailInput.value : '';
+            const receivedInput = row.querySelector('.received-input');
+            const received = receivedInput ? receivedInput.value : '';
+            const usedInput = row.querySelector('.used-input');
+            const used = usedInput ? usedInput.value : '';
+            const balanceDisplay = row.querySelector('.balance-display');
+            const balance = balanceDisplay ? balanceDisplay.innerText : '0';
+            const remarksInput = row.querySelector('.remarks-input');
+            const remarks = remarksInput ? remarksInput.value : '';
 
-                const opt = document.createElement('option');
-                opt.value = m;
-                opt.textContent = displayLabel;
-                filterSelect.appendChild(opt);
-            });
+            const updatedData = {
+                dateTime,
+                amountType,
+                detailText,
+                received,
+                used,
+                balance,
+                remarks
+            };
 
-            if (currentSelected) {
-                filterSelect.value = currentSelected;
+            // Local array update
+            const index = applicationData.findIndex(item => item.id === id);
+            if (index !== -1) {
+                applicationData[index] = { id, ...updatedData };
+            }
+
+            // Firebase update
+            try {
+                if (id) {
+                    const docRef = window.doc(window.db, "savingsData", id);
+                    await window.updateDoc(docRef, updatedData);
+                }
+            } catch (error) {
+                console.error("Error updating document: ", error);
             }
         }
 
@@ -383,22 +384,25 @@
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = ''; 
 
-            const filterVal = document.getElementById('monthYearFilter').value;
+            const selectedMonth = document.getElementById('monthFilter').value;
+            const selectedYear = document.getElementById('yearFilter').value;
 
             applicationData.forEach(item => {
-                if (filterVal === 'ALL') {
-                    createNewRow(item);
-                } else {
-                    if (item.dateTime) {
-                        let datePart = item.dateTime.split(' ')[0]; // DD-MM-YYYY
-                        if (datePart.includes('-')) {
-                            let parts = datePart.split('-');
-                            if (parts.length === 3) {
-                                let itemMonthYear = `${parts[2]}-${parts[1]}`; // YYYY-MM
-                                if (itemMonthYear === filterVal) {
-                                    createNewRow(item);
-                                }
-                            }
+                if (!item.dateTime) return;
+
+                let datePart = item.dateTime.split(' ')[0]; // DD-MM-YYYY
+                if (datePart.includes('-')) {
+                    let parts = datePart.split('-');
+                    if (parts.length === 3) {
+                        let itemDay = parts[0];
+                        let itemMonth = parts[1];
+                        let itemYear = parts[2];
+
+                        let matchesMonth = (selectedMonth === 'ALL' || itemMonth === selectedMonth);
+                        let matchesYear = (selectedYear === 'ALL' || itemYear === selectedYear);
+
+                        if (matchesMonth && matchesYear) {
+                            createRowElement(item);
                         }
                     }
                 }
@@ -407,9 +411,6 @@
         }
 
         function filterData() {
-            const filterSelect = document.getElementById('monthYearFilter');
-            // Selected filter ko localStorage mein save karna taake refresh ke baad bhi yaad rahe
-            localStorage.setItem('selectedMonthYearFilter', filterSelect.value);
             loadTableData();
         }
     </script>
