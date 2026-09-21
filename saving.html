@@ -124,7 +124,6 @@
 
         // Page load hone par Firebase se data fetch karna
         window.addEventListener('DOMContentLoaded', () => {
-            populateYearFilterOptions();
             fetchDataFromFirebase();
         });
     </script>
@@ -136,28 +135,72 @@
             const yearSelect = document.getElementById('yearFilter');
             const currentSelectedYear = yearSelect.value;
             
-            yearSelect.innerHTML = '<option value="ALL">All Years</option>';
-            
-            const now = new Date();
-            const currentYear = now.getFullYear();
-            
-            // Lifetime years (pichle 15 saal se agle 15 saal tak)
-            let years = [];
-            for (let y = currentYear - 15; y <= currentYear + 15; y++) {
-                years.push(y);
-            }
+            // Sirf wohi saal extract karna jo applicationData mein maujood hain
+            let yearsSet = new Set();
+            applicationData.forEach(item => {
+                if (item.dateTime) {
+                    let datePart = item.dateTime.split(' ')[0];
+                    if (datePart.includes('-')) {
+                        let parts = datePart.split('-');
+                        if (parts.length === 3) {
+                            yearsSet.add(parts[2]);
+                        }
+                    }
+                }
+            });
 
-            // Years ko ascending order (chote se bara, maslan 2011 se 2041 tak) mein arrange kiya gaya hai
-            years.sort((a, b) => a - b).forEach(y => {
+            let years = Array.from(yearsSet);
+            years.sort((a, b) => a - b); // Ascending order
+
+            yearSelect.innerHTML = '<option value="ALL">All Years</option>';
+            years.forEach(y => {
                 const opt = document.createElement('option');
                 opt.value = y;
                 opt.textContent = y;
                 yearSelect.appendChild(opt);
             });
 
-            if (currentSelectedYear) {
+            if (currentSelectedYear && (currentSelectedYear === 'ALL' || years.includes(currentSelectedYear))) {
                 yearSelect.value = currentSelectedYear;
+            } else {
+                yearSelect.value = 'ALL';
             }
+        }
+
+        function calculateGlobalBalances() {
+            // Data ko chronological order mein sort karna taake balance shuru se akhir tak theek bane
+            applicationData.sort((a, b) => {
+                let timeA = convertToTimestamp(a.dateTime);
+                let timeB = convertToTimestamp(b.dateTime);
+                return timeA - timeB;
+            });
+
+            let runningBalance = 0;
+            applicationData.forEach((item, index) => {
+                let received = parseFloat(item.received) || 0;
+                let used = parseFloat(item.used) || 0;
+
+                if (index === 0) {
+                    runningBalance = received - used;
+                } else {
+                    runningBalance = runningBalance + received - used;
+                }
+                item.balance = String(runningBalance);
+            });
+        }
+
+        function convertToTimestamp(dateTimeStr) {
+            if (!dateTimeStr) return 0;
+            let parts = dateTimeStr.split(' ');
+            let dmy = parts[0]; 
+            let timePart = parts[1] || '00:00:00';
+            if (dmy && dmy.includes('-')) {
+                let p = dmy.split('-');
+                if (p.length === 3) {
+                    return new Date(`${p[2]}-${p[1]}-${p[0]}T${timePart}`).getTime();
+                }
+            }
+            return 0;
         }
 
         async function fetchDataFromFirebase() {
@@ -170,8 +213,8 @@
                         ...docSnap.data()
                     });
                 });
-                // Data ko ascending order (purana pehle, naya neeche) ke mutabiq sort karna taake nayi row neeche aaye
-                applicationData.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
+                calculateGlobalBalances();
+                populateYearFilterOptions();
                 loadTableData();
             } catch (error) {
                 console.error("Error fetching data from Firebase: ", error);
@@ -201,8 +244,9 @@
             try {
                 const docRef = await window.addDoc(window.collection(window.db, "savingsData"), newEntry);
                 newEntry.id = docRef.id;
-                // push use kiya gaya hai taake nayi row hamesha table ke aakhir (neeche) mein add ho
                 applicationData.push(newEntry);
+                calculateGlobalBalances();
+                populateYearFilterOptions();
                 loadTableData();
             } catch (error) {
                 console.error("Error adding document: ", error);
@@ -253,8 +297,8 @@
                         <input type="text" placeholder="Enter Detail" value="${detailText}" class="border border-blue-900 p-1 text-xs w-full detail-input rounded" oninput="updateRowData(this)">
                     </div>
                 </td>
-                <td><input type="number" value="${received}" ${receivedLocked} class="border border-blue-900 p-1 text-xs w-full received-input rounded" placeholder="0" onblur="lockInput(this); updateRowData(this);" oninput="calculateBalances();"></td>
-                <td><input type="number" value="${used}" ${usedLocked} class="border border-blue-900 p-1 text-xs w-full used-input rounded" placeholder="0" onblur="lockInput(this); updateRowData(this);" oninput="calculateBalances();"></td>
+                <td><input type="number" value="${received}" ${receivedLocked} class="border border-blue-900 p-1 text-xs w-full received-input rounded" placeholder="0" onblur="lockInput(this);" oninput="handleInputChange();"></td>
+                <td><input type="number" value="${used}" ${usedLocked} class="border border-blue-900 p-1 text-xs w-full used-input rounded" placeholder="0" onblur="lockInput(this);" oninput="handleInputChange();"></td>
                 <td><span class="balance-display font-semibold text-xs">${balance}</span></td>
                 <td><input type="text" value="${remarks}" class="border border-blue-900 p-1 text-xs w-full remarks-input rounded" placeholder="Reason/Where spent" oninput="updateRowData(this)"></td>
                 <td class="text-center"><button onclick="deleteRowFromFirebase(this)" class="text-red-600 font-bold text-xs hover:underline">Delete</button></td>
@@ -281,6 +325,43 @@
                 input.setAttribute('readonly', true);
                 input.classList.add('bg-gray-100');
             }
+            updateRowData(input);
+        }
+
+        function handleInputChange() {
+            // Live update balances across all data and refresh UI views & Firebase updates
+            syncTableToApplicationData();
+            calculateGlobalBalances();
+            updateAllDisplayedBalances();
+            saveAllDataToFirebase();
+        }
+
+        function syncTableToApplicationData() {
+            const rows = document.querySelectorAll('#tableBody tr');
+            rows.forEach(row => {
+                const id = row.getAttribute('data-id');
+                const item = applicationData.find(d => d.id === id);
+                if (item) {
+                    const receivedInput = row.querySelector('.received-input');
+                    const usedInput = row.querySelector('.used-input');
+                    item.received = receivedInput ? receivedInput.value : '';
+                    item.used = usedInput ? usedInput.value : '';
+                }
+            });
+        }
+
+        function updateAllDisplayedBalances() {
+            const rows = document.querySelectorAll('#tableBody tr');
+            rows.forEach(row => {
+                const id = row.getAttribute('data-id');
+                const item = applicationData.find(d => d.id === id);
+                if (item) {
+                    const balanceDisplay = row.querySelector('.balance-display');
+                    if (balanceDisplay) {
+                        balanceDisplay.textContent = item.balance;
+                    }
+                }
+            });
         }
 
         async function deleteRowFromFirebase(btn) {
@@ -291,34 +372,13 @@
                 if (id) {
                     await window.deleteDoc(window.doc(window.db, "savingsData", id));
                 }
-                row.remove();
-                calculateBalances();
-                fetchDataFromFirebase();
+                applicationData = applicationData.filter(item => item.id !== id);
+                calculateGlobalBalances();
+                populateYearFilterOptions();
+                loadTableData();
             } catch (error) {
                 console.error("Error deleting document: ", error);
             }
-        }
-
-        function calculateBalances() {
-            const rows = document.querySelectorAll('#tableBody tr');
-            let runningBalance = 0;
-
-            rows.forEach((row, index) => {
-                const receivedInput = row.querySelector('.received-input');
-                const usedInput = row.querySelector('.used-input');
-                const balanceDisplay = row.querySelector('.balance-display');
-
-                let received = parseFloat(receivedInput.value) || 0;
-                let used = parseFloat(usedInput.value) || 0;
-
-                if (index === 0) {
-                    runningBalance = received - used;
-                } else {
-                    runningBalance = runningBalance + received - used;
-                }
-
-                balanceDisplay.textContent = runningBalance;
-            });
         }
 
         async function updateRowData(element) {
@@ -331,7 +391,7 @@
 
             if (rawVal) {
                 let parts = rawVal.split('T');
-                let datePart = parts[0]; // YYYY-MM-DD
+                let datePart = parts[0]; 
                 let timePart = (parts[1] || '00:00') + ':00';
                 
                 if (datePart && datePart.includes('-')) {
@@ -350,35 +410,46 @@
             const received = receivedInput ? receivedInput.value : '';
             const usedInput = row.querySelector('.used-input');
             const used = usedInput ? usedInput.value : '';
-            const balanceDisplay = row.querySelector('.balance-display');
-            const balance = balanceDisplay ? balanceDisplay.innerText : '0';
             const remarksInput = row.querySelector('.remarks-input');
             const remarks = remarksInput ? remarksInput.value : '';
 
-            const updatedData = {
-                dateTime,
-                amountType,
-                detailText,
-                received,
-                used,
-                balance,
-                remarks
-            };
-
-            // Local array update
             const index = applicationData.findIndex(item => item.id === id);
             if (index !== -1) {
-                applicationData[index] = { id, ...updatedData };
+                applicationData[index].dateTime = dateTime;
+                applicationData[index].amountType = amountType;
+                applicationData[index].detailText = detailText;
+                applicationData[index].received = received;
+                applicationData[index].used = used;
+                applicationData[index].remarks = remarks;
             }
 
-            // Firebase update
+            calculateGlobalBalances();
+            populateYearFilterOptions();
+            updateAllDisplayedBalances();
+
             try {
                 if (id) {
-                    const docRef = window.doc(window.db, "savingsData", id);
-                    await window.updateDoc(docRef, updatedData);
+                    const itemToUpdate = applicationData.find(item => item.id === id);
+                    if (itemToUpdate) {
+                        const docRef = window.doc(window.db, "savingsData", id);
+                        await window.updateDoc(docRef, itemToUpdate);
+                    }
                 }
             } catch (error) {
                 console.error("Error updating document: ", error);
+            }
+        }
+
+        async function saveAllDataToFirebase() {
+            for (let item of applicationData) {
+                if (item.id) {
+                    try {
+                        const docRef = window.doc(window.db, "savingsData", item.id);
+                        await window.updateDoc(docRef, item);
+                    } catch (error) {
+                        console.error("Error updating document in batch: ", error);
+                    }
+                }
             }
         }
 
@@ -392,11 +463,10 @@
             applicationData.forEach(item => {
                 if (!item.dateTime) return;
 
-                let datePart = item.dateTime.split(' ')[0]; // DD-MM-YYYY
+                let datePart = item.dateTime.split(' ')[0]; 
                 if (datePart.includes('-')) {
                     let parts = datePart.split('-');
                     if (parts.length === 3) {
-                        let itemDay = parts[0];
                         let itemMonth = parts[1];
                         let itemYear = parts[2];
 
@@ -409,7 +479,6 @@
                     }
                 }
             });
-            calculateBalances();
         }
 
         function filterData() {
