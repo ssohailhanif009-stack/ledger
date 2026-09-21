@@ -57,7 +57,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                     PERSONAL DATA
                 </button>
-                <button onclick="openCreateLedgerModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-medium shadow transition flex items-center gap-1">
+                <button onclick="openCreateLedgerModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-medium shadow flex items-center gap-1">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
                     New Ledger
                 </button>
@@ -200,16 +200,72 @@
         </div>
     </div>
 
-    <!-- Script Logic -->
-    <script>
-        let ledgers = JSON.parse(localStorage.getItem('excel_ledgers')) || [];
+    <!-- Firebase Script & Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-analytics.js";
+        import { 
+            getFirestore, 
+            collection, 
+            doc, 
+            setDoc, 
+            deleteDoc, 
+            onSnapshot 
+        } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBNDifUQOSYt_nQSeL_ZIxXhfNzTGQJGdA",
+            authDomain: "ledger-df7a0.firebaseapp.com",
+            projectId: "ledger-df7a0",
+            storageBucket: "ledger-df7a0.firebasestorage.app",
+            messagingSenderId: "854106995075",
+            appId: "1:854106995075:web:198b3702c4214197929eb6",
+            measurementId: "G-9C0C5XSD5K"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const db = getFirestore(app);
+
+        let ledgers = [];
         let activeLedgerId = null;
 
-        function saveData() {
-            localStorage.setItem('excel_ledgers', JSON.stringify(ledgers));
+        // Firebase Firestore Listener (Realtime Data Fetching)
+        onSnapshot(collection(db, "ledgers"), (snapshot) => {
+            ledgers = [];
+            snapshot.forEach((docSnap) => {
+                ledgers.push(docSnap.data());
+            });
+            updateLedgerDropdown();
+            if (activeLedgerId) {
+                const activeExists = ledgers.some(l => l.id === activeLedgerId);
+                if (activeExists) {
+                    selectLedgerFromDropdown(activeLedgerId);
+                } else {
+                    selectLedgerFromDropdown('');
+                }
+            }
+        });
+
+        async function saveLedgerToFirebase(ledger) {
+            if (!ledger || !ledger.id) return;
+            try {
+                await setDoc(doc(db, "ledgers", ledger.id), ledger);
+            } catch (err) {
+                console.error("Firebase save error:", err);
+            }
         }
 
-        function updateLedgerDropdown() {
+        async function deleteLedgerFromFirebase(ledgerId) {
+            if (!ledgerId) return;
+            try {
+                await deleteDoc(doc(db, "ledgers", ledgerId));
+            } catch (err) {
+                console.error("Firebase delete error:", err);
+            }
+        }
+
+        window.updateLedgerDropdown = function() {
             const select = document.getElementById('topLedgerSelect');
             select.innerHTML = '<option value="">-- Choose a Ledger --</option>';
             
@@ -222,9 +278,9 @@
                 }
                 select.appendChild(opt);
             });
-        }
+        };
 
-        function selectLedgerFromDropdown(id) {
+        window.selectLedgerFromDropdown = function(id) {
             const removeBtn = document.getElementById('removeLedgerBtn');
             const personalDataBtn = document.getElementById('personalDataBtn');
             
@@ -255,30 +311,30 @@
 
             calculateRunningBalances(ledger);
             renderTransactions();
-        }
+        };
 
-        function removeActiveLedger() {
+        window.removeActiveLedger = async function() {
             if (!activeLedgerId) return;
             if (confirm('Kya aap waqai is ledger ko delete karna chahte hain?')) {
-                ledgers = ledgers.filter(l => l.id !== activeLedgerId);
-                saveData();
+                const idToDelete = activeLedgerId;
                 activeLedgerId = null;
-                updateLedgerDropdown();
+                await deleteLedgerFromFirebase(idToDelete);
                 selectLedgerFromDropdown('');
             }
-        }
+        };
 
-        function openCreateLedgerModal() {
+        window.openCreateLedgerModal = function() {
             document.getElementById('ledgerModal').classList.remove('hidden');
             document.getElementById('ledgerModal').classList.add('flex');
-        }
-        function closeCreateLedgerModal() {
+        };
+
+        window.closeCreateLedgerModal = function() {
             document.getElementById('ledgerModal').classList.add('hidden');
             document.getElementById('ledgerModal').classList.remove('flex');
             document.getElementById('ledgerForm').reset();
-        }
+        };
 
-        function openPersonalDataModal() {
+        window.openPersonalDataModal = function() {
             const ledger = ledgers.find(l => l.id === activeLedgerId);
             if (!ledger) return;
 
@@ -328,28 +384,28 @@
 
             document.getElementById('personalDataModal').classList.remove('hidden');
             document.getElementById('personalDataModal').classList.add('flex');
-        }
+        };
 
-        function closePersonalDataModal() {
+        window.closePersonalDataModal = function() {
             document.getElementById('personalDataModal').classList.add('hidden');
             document.getElementById('personalDataModal').classList.remove('flex');
-        }
+        };
 
-        function updatePersonalDataField(field, value) {
+        window.updatePersonalDataField = function(field, value) {
             const ledger = ledgers.find(l => l.id === activeLedgerId);
             if (!ledger) return;
             if (!ledger.personalData) ledger.personalData = {};
             ledger.personalData[field] = value;
-            saveData();
-        }
+            saveLedgerToFirebase(ledger);
+        };
 
-        function validateMobileNumber(value) {
+        window.validateMobileNumber = function(value) {
             const cleanVal = value.replace(/[^0-9]/g, '');
             document.getElementById('pdMobile').value = cleanVal;
             updatePersonalDataField('mobile', cleanVal);
-        }
+        };
 
-        function toggleNA(fieldId, dataKey, isChecked) {
+        window.toggleNA = function(fieldId, dataKey, isChecked) {
             const input = document.getElementById(fieldId);
             const ledger = ledgers.find(l => l.id === activeLedgerId);
             if (!ledger) return;
@@ -365,10 +421,10 @@
                 input.disabled = false;
                 ledger.personalData[dataKey] = '';
             }
-            saveData();
-        }
+            saveLedgerToFirebase(ledger);
+        };
 
-        function toggleNAFile(isChecked) {
+        window.toggleNAFile = function(isChecked) {
             const input = document.getElementById('pdPicture');
             const ledger = ledgers.find(l => l.id === activeLedgerId);
             if (!ledger) return;
@@ -381,10 +437,10 @@
                 document.getElementById('pdPicturePreviewContainer').classList.add('hidden');
                 document.getElementById('pdPicturePreviewImg').src = '';
             }
-            saveData();
-        }
+            saveLedgerToFirebase(ledger);
+        };
 
-        function handlePersonalPictureUpload(event) {
+        window.handlePersonalPictureUpload = function(event) {
             const file = event.target.files[0];
             if (!file) return;
 
@@ -417,7 +473,7 @@
                     if (ledger) {
                         if (!ledger.personalData) ledger.personalData = {};
                         ledger.personalData.picture = compressedDataUrl;
-                        saveData();
+                        saveLedgerToFirebase(ledger);
                     }
 
                     const picContainer = document.getElementById('pdPicturePreviewContainer');
@@ -427,15 +483,15 @@
                 }
             }
             reader.readAsDataURL(file);
-        }
+        };
 
-        function savePersonalDataForm() {
+        window.savePersonalDataForm = function() {
             const ledger = ledgers.find(l => l.id === activeLedgerId);
             if (!ledger) return;
             if (!ledger.personalData) ledger.personalData = {};
 
             ledger.personalData.isSaved = true;
-            saveData();
+            saveLedgerToFirebase(ledger);
 
             document.getElementById('pdFullName').disabled = true;
             document.getElementById('pdAddress').disabled = true;
@@ -447,16 +503,16 @@
 
             updateFormLockState(true);
             alert('Personal data successfully save aur lock ho gaya hai!');
-        }
+        };
 
-        function unlockPersonalDataForm() {
+        window.unlockPersonalDataForm = function() {
             if (confirm('Kya aap personal data ko dobara edit karna chahte hain?')) {
                 const ledger = ledgers.find(l => l.id === activeLedgerId);
                 if (!ledger) return;
                 if (!ledger.personalData) ledger.personalData = {};
 
                 ledger.personalData.isSaved = false;
-                saveData();
+                saveLedgerToFirebase(ledger);
 
                 const pd = ledger.personalData;
                 document.getElementById('pdFullName').disabled = false;
@@ -469,7 +525,7 @@
 
                 updateFormLockState(false);
             }
-        }
+        };
 
         function updateFormLockState(isSaved) {
             const saveBtn = document.getElementById('savePdBtn');
@@ -483,7 +539,7 @@
             }
         }
 
-        function downloadPDFReport() {
+        window.downloadPDFReport = function() {
             const ledger = ledgers.find(l => l.id === activeLedgerId);
             if (!ledger) return;
 
@@ -524,9 +580,9 @@
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-        }
+        };
 
-        function handleCreateLedger(e) {
+        window.handleCreateLedger = async function(e) {
             e.preventDefault();
             const fullName = document.getElementById('modalFullName').value;
             const purpose = document.getElementById('modalPurpose').value;
@@ -548,14 +604,12 @@
                 }
             };
 
-            ledgers.push(newLedger);
-            saveData();
+            await saveLedgerToFirebase(newLedger);
             closeCreateLedgerModal();
-            updateLedgerDropdown();
-            selectLedgerFromDropdown(newLedger.id);
-        }
+            activeLedgerId = newLedger.id;
+        };
 
-        function openAddTransactionRow() {
+        window.openAddTransactionRow = function() {
             const ledger = ledgers.find(l => l.id === activeLedgerId);
             if (!ledger) return;
 
@@ -571,6 +625,8 @@
             hours = hours ? hours : 12;
             const formattedTime = `${String(hours).padStart(2, '0')}:${minutes}:${seconds} ${ampm}`;
             const formattedDateTime = `${day}-${month}-${year} ${formattedTime}`;
+
+            if (!ledger.transactions) ledger.transactions = [];
 
             const newTx = {
                 id: 'tx_' + Date.now(),
@@ -588,12 +644,13 @@
 
             ledger.transactions.push(newTx);
             calculateRunningBalances(ledger);
-            saveData();
+            saveLedgerToFirebase(ledger);
             renderTransactions();
-        }
+        };
 
         function calculateRunningBalances(ledger) {
             let currentBalance = 0;
+            if (!ledger.transactions) ledger.transactions = [];
             ledger.transactions.forEach(tx => {
                 const amt = parseFloat(tx.amount) || 0;
                 const pd = parseFloat(tx.paid) || 0;
@@ -634,7 +691,7 @@
             const tbody = document.getElementById('transactionTableBody');
             tbody.innerHTML = '';
 
-            if (!ledger || ledger.transactions.length === 0) {
+            if (!ledger || !ledger.transactions || ledger.transactions.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-slate-400">No records found. Click "Create New Row" to add entries.</td></tr>`;
                 return;
             }
@@ -690,15 +747,15 @@
             return 'Detail';
         }
 
-        function updateRemarkType(txId, type) {
+        window.updateRemarkType = function(txId, type) {
             updateTxField(txId, 'remarkType', type);
             if (!type) {
                 updateTxField(txId, 'remarkDetail', '');
             }
             renderTransactions();
-        }
+        };
 
-        function updateDateValue(txId, val) {
+        window.updateDateValue = function(txId, val) {
             const formattedDateOnly = convertToDDMMYYYY(val);
             const ledger = ledgers.find(l => l.id === activeLedgerId);
             if (!ledger) return;
@@ -707,11 +764,11 @@
 
             const oldTime = tx.date.includes(' ') ? tx.date.split(' ').slice(1).join(' ') : '12:00:00 AM';
             tx.date = `${formattedDateOnly} ${oldTime}`;
-            saveData();
+            saveLedgerToFirebase(ledger);
             renderTransactions();
-        }
+        };
 
-        function updateTxField(txId, field, value) {
+        window.updateTxField = function(txId, field, value) {
             const ledger = ledgers.find(l => l.id === activeLedgerId);
             if (!ledger) return;
             const tx = ledger.transactions.find(t => t.id === txId);
@@ -725,22 +782,22 @@
                 if (balCell) balCell.innerText = t.balance;
             });
 
-            saveData();
-        }
+            saveLedgerToFirebase(ledger);
+        };
 
-        function lockFieldOnBlur(txId, field, value) {
+        window.lockFieldOnBlur = function(txId, field, value) {
             if (value !== '' && value !== '0' && value !== 0) {
                 const ledger = ledgers.find(l => l.id === activeLedgerId);
                 if (!ledger) return;
                 const tx = ledger.transactions.find(t => t.id === txId);
                 if (!tx) return;
                 tx[field + 'Locked'] = true;
-                saveData();
+                saveLedgerToFirebase(ledger);
                 renderTransactions();
             }
-        }
+        };
 
-        function handleImageUpload(event, txId) {
+        window.handleImageUpload = function(event, txId) {
             const file = event.target.files[0];
             if (!file) return;
 
@@ -773,30 +830,28 @@
                 }
             }
             reader.readAsDataURL(file);
-        }
+        };
 
-        function deleteTransaction(txId) {
+        window.deleteTransaction = function(txId) {
             const ledger = ledgers.find(l => l.id === activeLedgerId);
             if (!ledger) return;
             ledger.transactions = ledger.transactions.filter(t => t.id !== txId);
             calculateRunningBalances(ledger);
-            saveData();
+            saveLedgerToFirebase(ledger);
             renderTransactions();
-        }
+        };
 
-        function openImageModal(src) {
+        window.openImageModal = function(src) {
             document.getElementById('modalImagePreviewTag').src = src;
             document.getElementById('downloadImageBtn').href = src;
             document.getElementById('imageModal').classList.remove('hidden');
             document.getElementById('imageModal').classList.add('flex');
-        }
-        function closeImageModal() {
+        };
+
+        window.closeImageModal = function() {
             document.getElementById('imageModal').classList.add('hidden');
             document.getElementById('imageModal').classList.remove('flex');
-        }
-
-        // Initial Load
-        updateLedgerDropdown();
+        };
     </script>
 </body>
 </html>
