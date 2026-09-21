@@ -122,7 +122,6 @@
         window.deleteDoc = deleteDoc;
         window.doc = doc;
 
-        // Page load hone par Firebase se data fetch karna
         window.addEventListener('DOMContentLoaded', () => {
             fetchDataFromFirebase();
         });
@@ -167,7 +166,6 @@
         }
 
         function calculateGlobalBalances() {
-            // Data ko hamesha chronological order mein sort karna taake balance aur sorting theek rahe
             applicationData.sort((a, b) => {
                 let timeA = convertToTimestamp(a.dateTime);
                 let timeB = convertToTimestamp(b.dateTime);
@@ -234,7 +232,8 @@
             try {
                 const docRef = await window.addDoc(window.collection(window.db, "savingsData"), newEntry);
                 newEntry.id = docRef.id;
-                applicationData.push(newEntry);
+                // Nayi row ko array ke shuru mein add karna taake woh foran upar show ho
+                applicationData.unshift(newEntry);
                 calculateGlobalBalances();
                 populateYearFilterOptions();
                 loadTableData();
