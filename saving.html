@@ -187,7 +187,7 @@
         }
 
         function convertToTimestamp(dateTimeStr) {
-            if (!dateTimeStr) return 0;
+            if (!dateTimeStr) return Number.MAX_SAFE_INTEGER; // Bagair date wali rows ko aakhir mein rakhne ke liye
             let parts = dateTimeStr.split(' ');
             let dmy = parts[0]; 
             let timePart = parts[1] || '00:00:00';
@@ -197,7 +197,7 @@
                     return new Date(`${p[2]}-${p[1]}-${p[0]}T${timePart}`).getTime();
                 }
             }
-            return 0;
+            return Number.MAX_SAFE_INTEGER;
         }
 
         async function fetchDataFromFirebase() {
@@ -232,8 +232,7 @@
             try {
                 const docRef = await window.addDoc(window.collection(window.db, "savingsData"), newEntry);
                 newEntry.id = docRef.id;
-                // Nayi row ko array ke shuru mein add karna taake woh foran upar show ho
-                applicationData.unshift(newEntry);
+                applicationData.push(newEntry);
                 calculateGlobalBalances();
                 populateYearFilterOptions();
                 loadTableData();
