@@ -564,17 +564,25 @@
             const day = String(now.getDate()).padStart(2, '0');
             const month = String(now.getMonth() + 1).padStart(2, '0');
             const year = now.getFullYear();
-            const hours = String(now.getHours()).padStart(2, '0');
+            
+            // Current Auto Time (HH:MM:SS AM/PM)
+            let hours = now.getHours();
             const minutes = String(now.getMinutes()).padStart(2, '0');
             const seconds = String(now.getSeconds()).padStart(2, '0');
-            const formattedDateTime = `${day}-${month}-${year} ${hours}:${minutes}:${seconds}`;
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+            const formattedTime = `${String(hours).padStart(2, '0')}:${minutes}:${seconds} ${ampm}`;
+
+            const formattedDateTime = `${day}-${month}-${year} ${formattedTime}`;
 
             const newTx = {
                 id: 'tx_' + Date.now(),
                 title: '',
-                date: formattedDateTime,
+                dateTime: formattedDateTime,
                 amount: 0,
                 paid: 0,
+                paidLocked: false,
                 balance: 0,
                 remarkType: '',
                 remarkDetail: '',
@@ -597,29 +605,6 @@
             });
         }
 
-        function convertToDDMMYYYYHHMMSS(dateStr) {
-            if (!dateStr) return '';
-            if (dateStr.includes('-')) {
-                const parts = dateStr.split('-');
-                if (parts[0].length === 4) {
-                    return `${parts[2]}-${parts[1]}-${parts[0]}`;
-                }
-            }
-            return dateStr;
-        }
-
-        function convertToYYYYMMDD(dateStr) {
-            if (!dateStr) return '';
-            const baseDate = dateStr.split(' ')[0];
-            if (baseDate && baseDate.includes('-')) {
-                const parts = baseDate.split('-');
-                if (parts[0].length === 2) {
-                    return `${parts[2]}-${parts[1]}-${parts[0]}`;
-                }
-            }
-            return baseDate;
-        }
-
         function renderTransactions() {
             const ledger = ledgers.find(l => l.id === activeLedgerId);
             const tbody = document.getElementById('transactionTableBody');
@@ -638,18 +623,18 @@
                     <input type="text" value="${tx.remarkDetail}" oninput="updateTxField('${tx.id}', 'remarkDetail', this.value)" placeholder="${getRemarkPlaceholder(tx.remarkType)}" class="w-full border border-slate-300 rounded px-2 py-1 text-[11px] outline-none focus:ring-1 focus:ring-blue-500 mt-1">
                 ` : '';
 
-                const pickerDateValue = convertToYYYYMMDD(tx.date);
+                // Check if Paid is locked (if paid > 0 or explicitly locked)
+                const isPaidLocked = tx.paidLocked || (parseFloat(tx.paid) > 0);
 
                 tr.innerHTML = `
                     <td class="p-1.5"><input type="text" value="${tx.title}" oninput="updateTxField('${tx.id}', 'title', this.value)" class="w-full border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 min-w-[120px]" placeholder="Title/Purpose"></td>
-                    <td class="p-1.5">
-                        <div class="flex flex-col gap-0.5 min-w-[140px]">
-                            <input type="date" value="${pickerDateValue}" onchange="updateDateValue('${tx.id}', this.value)" class="border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500" title="Select Date">
-                            <span class="text-[10px] text-slate-500 font-mono px-1">${tx.date}</span>
-                        </div>
+                    <td class="p-1.5 whitespace-nowrap text-xs text-slate-600 font-medium">
+                        ${tx.dateTime || ''}
                     </td>
-                    <td class="p-1.5"><input type="number" id="amt_${tx.id}" value="${tx.amount}" oninput="handleAmountInput('${tx.id}', 'amount', this.value)" onblur="lockField('amt_${tx.id}')" class="w-20 border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"></td>
-                    <td class="p-1.5"><input type="number" id="pd_${tx.id}" value="${tx.paid}" oninput="handleAmountInput('${tx.id}', 'paid', this.value)" onblur="lockField('pd_${tx.id}')" class="w-20 border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"></td>
+                    <td class="p-1.5"><input type="number" value="${tx.amount}" oninput="updateTxField('${tx.id}', 'amount', this.value)" class="w-20 border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"></td>
+                    <td class="p-1.5">
+                        <input type="number" value="${tx.paid}" oninput="handlePaidInput('${tx.id}', this.value)" ${isPaidLocked ? 'readonly title="Paid amount is locked and cannot be edited"' : ''} class="w-20 border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 ${isPaidLocked ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}">
+                    </td>
                     <td class="p-1.5 font-bold text-slate-700 bg-slate-50 whitespace-nowrap" id="bal_${tx.id}">${tx.balance}</td>
                     <td class="p-1.5 min-w-[140px]">
                         <select onchange="updateRemarkType('${tx.id}', this.value)" class="border border-slate-300 rounded px-2 py-1 text-[11px] outline-none bg-white w-full">
@@ -690,36 +675,19 @@
             renderTransactions();
         }
 
-        function updateDateValue(txId, val) {
+        function handlePaidInput(txId, value) {
             const ledger = ledgers.find(l => l.id === activeLedgerId);
             if (!ledger) return;
             const tx = ledger.transactions.find(t => t.id === txId);
             if (!tx) return;
 
-            // Retain existing time part if present
-            let timePart = "00:00:00";
-            if (tx.date && tx.date.includes(' ')) {
-                timePart = tx.date.split(' ')[1];
-            } else {
-                const now = new Date();
-                timePart = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+            tx.paid = value;
+            if (parseFloat(value) > 0) {
+                tx.paidLocked = true;
             }
-
-            const formattedDate = convertToDDMMYYYYHHMMSS(val);
-            tx.date = `${formattedDate} ${timePart}`;
+            calculateRunningBalances(ledger);
             saveData();
             renderTransactions();
-        }
-
-        function handleAmountInput(txId, field, value) {
-            updateTxField(txId, field, value);
-        }
-
-        function lockField(elementId) {
-            const el = document.getElementById(elementId);
-            if (el) {
-                el.blur();
-            }
         }
 
         function updateTxField(txId, field, value) {
