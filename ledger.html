@@ -488,7 +488,6 @@
             if (!ledger) return;
 
             const pd = ledger.personalData || {};
-            
             const htmlContent = `
                 <!DOCTYPE html>
                 <html>
@@ -520,7 +519,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${ledger.fullName.replace(/\s+/g, '_')}_Personal_Data.html`;
+            a.download = `${ledger.fullName}_Personal_Report.html`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -564,8 +563,6 @@
             const day = String(now.getDate()).padStart(2, '0');
             const month = String(now.getMonth() + 1).padStart(2, '0');
             const year = now.getFullYear();
-            
-            // Current Auto Time (HH:MM:SS AM/PM)
             let hours = now.getHours();
             const minutes = String(now.getMinutes()).padStart(2, '0');
             const seconds = String(now.getSeconds()).padStart(2, '0');
@@ -573,17 +570,17 @@
             hours = hours % 12;
             hours = hours ? hours : 12;
             const formattedTime = `${String(hours).padStart(2, '0')}:${minutes}:${seconds} ${ampm}`;
-
             const formattedDateTime = `${day}-${month}-${year} ${formattedTime}`;
 
             const newTx = {
                 id: 'tx_' + Date.now(),
                 title: '',
-                dateTime: formattedDateTime,
+                date: formattedDateTime,
                 amount: 0,
                 paid: 0,
-                paidLocked: false,
                 balance: 0,
+                amountLocked: false,
+                paidLocked: false,
                 remarkType: '',
                 remarkDetail: '',
                 proofImage: ''
@@ -605,6 +602,33 @@
             });
         }
 
+        function extractDateOnly(dateStr) {
+            if (!dateStr) return '';
+            return dateStr.split(' ')[0] || dateStr;
+        }
+
+        function convertToDDMMYYYY(dateStr) {
+            if (!dateStr) return '';
+            if (dateStr.includes('-')) {
+                const parts = dateStr.split('-');
+                if (parts[0].length === 4) {
+                    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+                }
+            }
+            return dateStr;
+        }
+
+        function convertToYYYYMMDD(dateStr) {
+            if (!dateStr) return '';
+            if (dateStr.includes('-')) {
+                const parts = dateStr.split('-');
+                if (parts[0].length === 2) {
+                    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+                }
+            }
+            return dateStr;
+        }
+
         function renderTransactions() {
             const ledger = ledgers.find(l => l.id === activeLedgerId);
             const tbody = document.getElementById('transactionTableBody');
@@ -623,18 +647,17 @@
                     <input type="text" value="${tx.remarkDetail}" oninput="updateTxField('${tx.id}', 'remarkDetail', this.value)" placeholder="${getRemarkPlaceholder(tx.remarkType)}" class="w-full border border-slate-300 rounded px-2 py-1 text-[11px] outline-none focus:ring-1 focus:ring-blue-500 mt-1">
                 ` : '';
 
-                // Check if Paid is locked (if paid > 0 or explicitly locked)
-                const isPaidLocked = tx.paidLocked || (parseFloat(tx.paid) > 0);
+                const dateOnly = extractDateOnly(tx.date);
+                const pickerDateValue = convertToYYYYMMDD(dateOnly);
 
                 tr.innerHTML = `
                     <td class="p-1.5"><input type="text" value="${tx.title}" oninput="updateTxField('${tx.id}', 'title', this.value)" class="w-full border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 min-w-[120px]" placeholder="Title/Purpose"></td>
-                    <td class="p-1.5 whitespace-nowrap text-xs text-slate-600 font-medium">
-                        ${tx.dateTime || ''}
-                    </td>
-                    <td class="p-1.5"><input type="number" value="${tx.amount}" oninput="updateTxField('${tx.id}', 'amount', this.value)" class="w-20 border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"></td>
                     <td class="p-1.5">
-                        <input type="number" value="${tx.paid}" oninput="handlePaidInput('${tx.id}', this.value)" ${isPaidLocked ? 'readonly title="Paid amount is locked and cannot be edited"' : ''} class="w-20 border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 ${isPaidLocked ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}">
+                        <input type="date" value="${pickerDateValue}" onchange="updateDateValue('${tx.id}', this.value)" class="border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 min-w-[120px]" title="Select Date">
+                        <div class="text-[10px] text-slate-500 mt-0.5">${tx.date}</div>
                     </td>
+                    <td class="p-1.5"><input type="number" value="${tx.amount}" ${tx.amountLocked ? 'readonly class="w-20 border border-slate-300 bg-slate-100 rounded px-2 py-1 text-xs outline-none"' : 'oninput="updateTxField(\''+tx.id+'\', \'amount\', this.value)" onblur="lockFieldOnBlur(\''+tx.id+'\', \'amount\', this.value)" class="w-20 border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"'} ></td>
+                    <td class="p-1.5"><input type="number" value="${tx.paid}" ${tx.paidLocked ? 'readonly class="w-20 border border-slate-300 bg-slate-100 rounded px-2 py-1 text-xs outline-none"' : 'oninput="updateTxField(\''+tx.id+'\', \'paid\', this.value)" onblur="lockFieldOnBlur(\''+tx.id+'\', \'paid\', this.value)" class="w-20 border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"'} ></td>
                     <td class="p-1.5 font-bold text-slate-700 bg-slate-50 whitespace-nowrap" id="bal_${tx.id}">${tx.balance}</td>
                     <td class="p-1.5 min-w-[140px]">
                         <select onchange="updateRemarkType('${tx.id}', this.value)" class="border border-slate-300 rounded px-2 py-1 text-[11px] outline-none bg-white w-full">
@@ -675,17 +698,15 @@
             renderTransactions();
         }
 
-        function handlePaidInput(txId, value) {
+        function updateDateValue(txId, val) {
+            const formattedDateOnly = convertToDDMMYYYY(val);
             const ledger = ledgers.find(l => l.id === activeLedgerId);
             if (!ledger) return;
             const tx = ledger.transactions.find(t => t.id === txId);
             if (!tx) return;
 
-            tx.paid = value;
-            if (parseFloat(value) > 0) {
-                tx.paidLocked = true;
-            }
-            calculateRunningBalances(ledger);
+            const oldTime = tx.date.includes(' ') ? tx.date.split(' ').slice(1).join(' ') : '12:00:00 AM';
+            tx.date = `${formattedDateOnly} ${oldTime}`;
             saveData();
             renderTransactions();
         }
@@ -705,6 +726,18 @@
             });
 
             saveData();
+        }
+
+        function lockFieldOnBlur(txId, field, value) {
+            if (value !== '' && value !== '0' && value !== 0) {
+                const ledger = ledgers.find(l => l.id === activeLedgerId);
+                if (!ledger) return;
+                const tx = ledger.transactions.find(t => t.id === txId);
+                if (!tx) return;
+                tx[field + 'Locked'] = true;
+                saveData();
+                renderTransactions();
+            }
         }
 
         function handleImageUpload(event, txId) {
