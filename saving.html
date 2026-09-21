@@ -221,7 +221,6 @@
         }
 
         async function addNewRowToFirebase() {
-            // Nayi row mein default date/time bilkul khali rakhi hai taake user khud select kare
             const newEntry = {
                 dateTime: "",
                 amountType: "",
@@ -413,7 +412,6 @@
                 applicationData[index].remarks = remarks;
             }
 
-            // Data update hone par dobara sort aur calculate kar ke table reload karna taake row apni sahi date ki jagah par chali jaye
             calculateGlobalBalances();
             populateYearFilterOptions();
             loadTableData();
@@ -451,7 +449,6 @@
             const selectedMonth = document.getElementById('monthFilter').value;
             const selectedYear = document.getElementById('yearFilter').value;
 
-            // Sorting ensure karne ke baad render karna
             applicationData.sort((a, b) => {
                 let timeA = convertToTimestamp(a.dateTime);
                 let timeB = convertToTimestamp(b.dateTime);
@@ -460,7 +457,6 @@
 
             applicationData.forEach(item => {
                 if (!item.dateTime) {
-                    // Agar date select nahi ki hui tou usko bhi table mein dikhana taake user date daal sake
                     createRowElement(item);
                     return;
                 }
