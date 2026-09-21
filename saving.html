@@ -147,7 +147,8 @@
                 years.push(y);
             }
 
-            years.sort((a, b) => b - a).forEach(y => {
+            // Years ko ascending order (chote se bara, maslan 2011 se 2041 tak) mein arrange kiya gaya hai
+            years.sort((a, b) => a - b).forEach(y => {
                 const opt = document.createElement('option');
                 opt.value = y;
                 opt.textContent = y;
@@ -169,8 +170,8 @@
                         ...docSnap.data()
                     });
                 });
-                // Date ke lihaz se sort karna
-                applicationData.sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
+                // Data ko ascending order (purana pehle, naya neeche) ke mutabiq sort karna taake nayi row neeche aaye
+                applicationData.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
                 loadTableData();
             } catch (error) {
                 console.error("Error fetching data from Firebase: ", error);
@@ -200,7 +201,8 @@
             try {
                 const docRef = await window.addDoc(window.collection(window.db, "savingsData"), newEntry);
                 newEntry.id = docRef.id;
-                applicationData.unshift(newEntry);
+                // push use kiya gaya hai taake nayi row hamesha table ke aakhir (neeche) mein add ho
+                applicationData.push(newEntry);
                 loadTableData();
             } catch (error) {
                 console.error("Error adding document: ", error);
