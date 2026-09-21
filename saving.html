@@ -187,7 +187,7 @@
         }
 
         function convertToTimestamp(dateTimeStr) {
-            if (!dateTimeStr) return Number.MAX_SAFE_INTEGER; // Bagair date wali rows ko aakhir mein rakhne ke liye
+            if (!dateTimeStr || dateTimeStr.trim() === "") return Number.MAX_SAFE_INTEGER;
             let parts = dateTimeStr.split(' ');
             let dmy = parts[0]; 
             let timePart = parts[1] || '00:00:00';
@@ -454,7 +454,7 @@
             });
 
             applicationData.forEach(item => {
-                if (!item.dateTime) {
+                if (!item.dateTime || item.dateTime.trim() === "") {
                     createRowElement(item);
                     return;
                 }
