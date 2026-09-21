@@ -318,7 +318,7 @@
 
         window.removeActiveLedger = async function() {
             if (!activeLedgerId) return;
-            if (confirm('Kya aap waqai is ledger ko delete کرنا chahte hain?')) {
+            if (confirm('Kya aap waqai is ledger ko delete karna chahte hain?')) {
                 const idToDelete = activeLedgerId;
                 activeLedgerId = null;
                 await deleteLedgerFromFirebase(idToDelete);
