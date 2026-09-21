@@ -282,13 +282,13 @@
                         <option value="Other" ${amountType === 'Other' ? 'selected' : ''}>Other</option>
                     </select>
                     <div class="detail-container mt-1 ${amountType === 'Other' ? '' : 'hidden'}">
-                        <input type="text" placeholder="Enter Detail" value="${detailText}" class="border border-blue-900 p-1 text-xs w-full detail-input rounded" oninput="updateRowData(this)">
+                        <input type="text" placeholder="Enter Detail" value="${detailText}" class="border border-blue-900 p-1 text-xs w-full detail-input rounded" onblur="updateRowData(this)">
                     </div>
                 </td>
                 <td><input type="number" value="${received}" ${receivedLocked} class="border border-blue-900 p-1 text-xs w-full received-input rounded" placeholder="0" onblur="lockInput(this);" oninput="handleInputChange();"></td>
                 <td><input type="number" value="${used}" ${usedLocked} class="border border-blue-900 p-1 text-xs w-full used-input rounded" placeholder="0" onblur="lockInput(this);" oninput="handleInputChange();"></td>
                 <td><span class="balance-display font-semibold text-xs">${balance}</span></td>
-                <td><input type="text" value="${remarks}" class="border border-blue-900 p-1 text-xs w-full remarks-input rounded" placeholder="Reason/Where spent" oninput="updateRowData(this)"></td>
+                <td><input type="text" value="${remarks}" class="border border-blue-900 p-1 text-xs w-full remarks-input rounded" placeholder="Reason/Where spent" onblur="updateRowData(this)"></td>
                 <td class="text-center"><button onclick="deleteRowFromFirebase(this)" class="text-red-600 font-bold text-xs hover:underline">Delete</button></td>
             `;
 
