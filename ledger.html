@@ -161,15 +161,11 @@
                     <textarea id="pdReason" rows="2" onblur="updatePersonalDataField('reason', this.value)" class="w-full border rounded px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-blue-500" placeholder="Detail reason..."></textarea>
                 </div>
                 <div>
-                    <label class="block font-medium text-slate-700 mb-1">Picture (Gallery se select karein)</label>
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <!-- Gallery / Folder Button -->
-                        <input type="file" onchange="handlePersonalPictureUpload(event)" class="hidden" id="pdGalInput">
-                        <label for="pdGalInput" class="bg-slate-700 hover:bg-slate-800 text-white px-3 py-1.5 rounded text-xs font-semibold cursor-pointer shadow-sm">
-                            🖼️ Choose Gallery
-                        </label>
-
-                        <label class="flex items-center gap-1 cursor-pointer whitespace-nowrap ml-auto">
+                    <label class="block font-medium text-slate-700 mb-0.5">Picture (Camera Capture)</label>
+                    <div class="flex items-center gap-2">
+                        <!-- capture="environment" se direct camera khulega -->
+                        <input type="file" id="pdPicture" accept="image/*" capture="environment" onchange="handlePersonalPictureUpload(event)" class="w-full text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-slate-100 file:text-slate-700">
+                        <label class="flex items-center gap-1 cursor-pointer whitespace-nowrap">
                             <input type="checkbox" id="pdPictureNA" onchange="toggleNAFile(this.checked)" class="rounded"> <span class="text-[11px]">NA</span>
                         </label>
                     </div>
@@ -371,14 +367,14 @@
             document.getElementById('pdFullName').disabled = pd.isSaved || false;
             document.getElementById('pdAddress').disabled = pd.isSaved || false;
 
+            const picInput = document.getElementById('pdPicture');
             const picContainer = document.getElementById('pdPicturePreviewContainer');
             const picImg = document.getElementById('pdPicturePreviewImg');
             const picNACheckbox = document.getElementById('pdPictureNA');
-            const galInput = document.getElementById('pdGalInput');
 
             picNACheckbox.checked = pd.pictureNA || false;
             picNACheckbox.disabled = pd.isSaved || false;
-            galInput.disabled = pd.pictureNA || pd.isSaved || false;
+            picInput.disabled = pd.pictureNA || pd.isSaved || false;
 
             if (pd.picture) {
                 picImg.src = pd.picture;
@@ -435,13 +431,13 @@
         };
 
         window.toggleNAFile = function(isChecked) {
-            const galInput = document.getElementById('pdGalInput');
+            const input = document.getElementById('pdPicture');
             const ledger = ledgers.find(l => l.id === activeLedgerId);
             if (!ledger) return;
             if (!ledger.personalData) ledger.personalData = {};
 
             ledger.personalData.pictureNA = isChecked;
-            galInput.disabled = isChecked;
+            input.disabled = isChecked;
             if (isChecked) {
                 ledger.personalData.picture = '';
                 document.getElementById('pdPicturePreviewContainer').classList.add('hidden');
@@ -508,7 +504,7 @@
             document.getElementById('pdMobile').disabled = true;
             document.getElementById('pdMobileNA').disabled = true;
             document.getElementById('pdReason').disabled = true;
-            document.getElementById('pdGalInput').disabled = true;
+            document.getElementById('pdPicture').disabled = true;
             document.getElementById('pdPictureNA').disabled = true;
 
             updateFormLockState(true);
@@ -530,7 +526,7 @@
                 document.getElementById('pdMobile').disabled = pd.mobileNA;
                 document.getElementById('pdMobileNA').disabled = false;
                 document.getElementById('pdReason').disabled = false;
-                document.getElementById('pdGalInput').disabled = pd.pictureNA;
+                document.getElementById('pdPicture').disabled = pd.pictureNA;
                 document.getElementById('pdPictureNA').disabled = false;
 
                 updateFormLockState(false);
@@ -738,14 +734,9 @@
                         ${detailInputHtml}
                     </td>
                     <td class="p-1.5 whitespace-nowrap">
-                        <div class="flex items-center gap-1">
+                        <div class="flex items-center gap-1.5">
                             ${tx.proofImage ? `<img src="${tx.proofImage}" onclick="openImageModal('${tx.proofImage}')" class="w-7 h-7 object-cover rounded cursor-pointer border hover:opacity-80 shadow-sm" title="Click to view">` : ''}
-
-                            <!-- Gallery / Folder Button -->
-                            <input type="file" onchange="handleImageUpload(event, '${tx.id}')" class="hidden" id="gal_${tx.id}">
-                            <label for="gal_${tx.id}" class="bg-slate-700 hover:bg-slate-800 text-white px-2.5 py-1 rounded text-[10px] font-semibold cursor-pointer shadow-sm flex items-center">
-                                🖼️ Gallery
-                            </label>
+                            <input type="file" accept="image/*" onchange="handleImageUpload(event, '${tx.id}')" class="text-[10px] w-24 text-slate-500 file:mr-1 file:py-0.5 file:px-1.5 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
                         </div>
                     </td>
                     <td class="p-1.5 text-center">
@@ -796,7 +787,6 @@
             tx[field] = value;
             calculateRunningBalances(ledger);
             
-            ledger.transactions.transactions?.forEach?.(t => {})
             ledger.transactions.forEach(t => {
                 const balCell = document.getElementById(`bal_${t.id}`);
                 if (balCell) balCell.innerText = t.balance;
