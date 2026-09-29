@@ -717,6 +717,7 @@
                 title: '',
                 titleLocked: false,
                 date: formattedDateTime,
+                dateLocked: false,
                 amount: 0,
                 paid: 0,
                 balance: 0,
@@ -798,7 +799,7 @@
                 tr.innerHTML = `
                     <td class="p-1.5"><input type="text" value="${tx.title || ''}" ${tx.titleLocked ? 'readonly class="w-full border border-slate-300 bg-slate-100 rounded px-2 py-1 text-xs outline-none min-w-[120px]"' : 'onfocus="isLocalTyping=true" onblur="lockFieldOnBlur(\''+tx.id+'\', \'title\', this.value)" class="w-full border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 min-w-[120px]"'} placeholder="Title/Purpose"></td>
                     <td class="p-1.5">
-                        <input type="date" value="${pickerDateValue}" onchange="updateDateValue('${tx.id}', this.value)" class="border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 min-w-[120px]" title="Select Date">
+                        <input type="date" value="${pickerDateValue}" ${tx.dateLocked ? 'disabled class="border border-slate-300 bg-slate-100 rounded px-2 py-1 text-xs outline-none min-w-[120px]"' : 'onchange="updateDateValue(\''+tx.id+'\', this.value)" class="border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 min-w-[120px]"'} title="Select Date">
                         <div class="text-[10px] text-slate-500 mt-0.5">${tx.date}</div>
                     </td>
                     <td class="p-1.5"><input type="number" value="${tx.amount}" ${tx.amountLocked ? 'readonly class="w-20 border border-slate-300 bg-slate-100 rounded px-2 py-1 text-xs outline-none"' : 'onfocus="isLocalTyping=true" onblur="lockFieldOnBlur(\''+tx.id+'\', \'amount\', this.value)" class="w-20 border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"'} ></td>
@@ -846,6 +847,7 @@
 
         window.updateDateValue = function(txId, val) {
             isLocalTyping = false;
+            if (!val) return;
             const formattedDateOnly = convertToDDMMYYYY(val);
             const ledger = ledgers.find(l => l.id === activeLedgerId);
             if (!ledger) return;
@@ -854,6 +856,7 @@
 
             const oldTime = tx.date.includes(' ') ? tx.date.split(' ').slice(1).join(' ') : '12:00:00 AM';
             tx.date = `${formattedDateOnly} ${oldTime}`;
+            tx.dateLocked = true;
             saveLedgerToFirebase(ledger);
             renderTransactions();
         };
