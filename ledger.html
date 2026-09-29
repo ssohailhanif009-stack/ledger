@@ -736,9 +736,34 @@
             renderTransactions();
         };
 
+        // Date Sorting Function (Sort transactions by Date chronologically)
+        function sortTransactionsByDate(transactions) {
+            if (!transactions || transactions.length <= 1) return;
+            transactions.sort((a, b) => {
+                const parseDate = (dStr) => {
+                    if (!dStr) return new Date(0);
+                    const parts = dStr.split(' ');
+                    const dateParts = parts[0].split('-');
+                    if (dateParts.length === 3) {
+                        // DD-MM-YYYY format handling
+                        const day = parseInt(dateParts[0], 10);
+                        const month = parseInt(dateParts[1], 10) - 1;
+                        const year = parseInt(dateParts[2], 10);
+                        return new Date(year, month, day);
+                    }
+                    return new Date(dStr);
+                };
+                return parseDate(a.date) - parseDate(b.date);
+            });
+        }
+
         function calculateRunningBalances(ledger) {
             let currentBalance = 0;
             if (!ledger.transactions) ledger.transactions = [];
+            
+            // Transactions ko pehle date ke hisab se sort karein
+            sortTransactionsByDate(ledger.transactions);
+
             ledger.transactions.forEach(tx => {
                 const amt = parseFloat(tx.amount) || 0;
                 const pd = parseFloat(tx.paid) || 0;
@@ -857,6 +882,9 @@
             const oldTime = tx.date.includes(' ') ? tx.date.split(' ').slice(1).join(' ') : '12:00:00 AM';
             tx.date = `${formattedDateOnly} ${oldTime}`;
             tx.dateLocked = true;
+            
+            // Recalculate balance and re-render so that row automatically moves to its sorted position
+            calculateRunningBalances(ledger);
             saveLedgerToFirebase(ledger);
             renderTransactions();
         };
