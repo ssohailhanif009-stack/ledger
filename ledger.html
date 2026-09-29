@@ -595,7 +595,7 @@
             URL.revokeObjectURL(url);
         };
 
-        // MS Word (.doc) Download Function for Active Ledger
+        // MS Word (.doc) Download Function for Active Ledger (Without Proof Image Column)
         window.downloadLedgerWordDoc = function() {
             const ledger = ledgers.find(l => l.id === activeLedgerId);
             if (!ledger) return;
@@ -604,7 +604,6 @@
             if (ledger.transactions && ledger.transactions.length > 0) {
                 ledger.transactions.forEach(tx => {
                     const remarksText = tx.remarkType ? `${tx.remarkType}${tx.remarkDetail ? ' (' + tx.remarkDetail + ')' : ''}` : '-';
-                    const imgHtml = tx.proofImage ? `<img src="${tx.proofImage}" width="60" height="60" style="object-fit:cover; border:1px solid #ccc;" />` : '-';
 
                     tableRowsHtml += `
                         <tr>
@@ -614,12 +613,11 @@
                             <td style="padding: 8px; border: 1px solid #cbd5e1;">${tx.paid || 0}</td>
                             <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: bold;">${tx.balance || 0}</td>
                             <td style="padding: 8px; border: 1px solid #cbd5e1;">${remarksText}</td>
-                            <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">${imgHtml}</td>
                         </tr>
                     `;
                 });
             } else {
-                tableRowsHtml = `<tr><td colspan="7" style="padding: 10px; text-align: center;">No transactions found.</td></tr>`;
+                tableRowsHtml = `<tr><td colspan="6" style="padding: 10px; text-align: center;">No transactions found.</td></tr>`;
             }
 
             const docHtml = `
@@ -647,7 +645,6 @@
                                 <th>Paid</th>
                                 <th>Balance</th>
                                 <th>Remarks</th>
-                                <th>Proof</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -792,7 +789,7 @@
                 tr.className = "hover:bg-slate-50 transition";
                 
                 const detailInputHtml = tx.remarkType ? `
-                    <input type="text" value="${tx.remarkDetail || ''}" ${tx.remarkLocked ? 'disabled' : ''} onfocus="isLocalTyping=true" onblur="lockFieldOnBlur('${tx.id}', 'remarkDetail', this.value)" placeholder="${getRemarkPlaceholder(tx.remarkType)}" class="w-full border border-slate-300 ${tx.remarkLocked ? 'bg-slate-100' : ''} rounded px-2 py-1 text-[11px] outline-none focus:ring-1 focus:ring-blue-500 mt-1">
+                    <input type="text" value="${tx.remarkDetail || ''}" ${tx.remarkLocked ? 'disabled class="w-full border border-slate-300 bg-slate-100 rounded px-2 py-1 text-[11px] outline-none mt-1"' : 'onfocus="isLocalTyping=true" onblur="lockFieldOnBlur(\''+tx.id+'\', \'remarkDetail\', this.value)" placeholder="'+getRemarkPlaceholder(tx.remarkType)+'" class="w-full border border-slate-300 rounded px-2 py-1 text-[11px] outline-none focus:ring-1 focus:ring-blue-500 mt-1"'} >
                 ` : '';
 
                 const dateOnly = extractDateOnly(tx.date);
@@ -843,16 +840,6 @@
             updateTxField(txId, 'remarkType', type);
             if (!type) {
                 updateTxField(txId, 'remarkDetail', '');
-            } else {
-                // Select change hone par locking trigger
-                const ledger = ledgers.find(l => l.id === activeLedgerId);
-                if (ledger) {
-                    const tx = ledger.transactions.find(t => t.id === txId);
-                    if (tx) {
-                        tx.remarkLocked = true;
-                        saveLedgerToFirebase(ledger);
-                    }
-                }
             }
             renderTransactions();
         };
@@ -897,7 +884,11 @@
                 if (!ledger) return;
                 const tx = ledger.transactions.find(t => t.id === txId);
                 if (!tx) return;
-                tx[field + 'Locked'] = true;
+                if (field === 'remarkDetail') {
+                    tx.remarkLocked = true;
+                } else {
+                    tx[field + 'Locked'] = true;
+                }
                 saveLedgerToFirebase(ledger);
                 renderTransactions();
             }
