@@ -267,28 +267,33 @@
             const balance = item.balance || '0';
             const remarks = item.remarks || '';
             
+            // Checking locked status for all columns
+            const dateLocked = dateTimeVal !== '' ? 'readonly bg-gray-100' : '';
+            const typeLocked = amountType !== '' ? 'disabled bg-gray-100' : '';
+            const detailLocked = detailText !== '' ? 'readonly bg-gray-100' : '';
             const receivedLocked = received !== '' ? 'readonly bg-gray-100' : '';
             const usedLocked = used !== '' ? 'readonly bg-gray-100' : '';
+            const remarksLocked = remarks !== '' ? 'readonly bg-gray-100' : '';
 
             row.innerHTML = `
                 <td>
-                    <input type="datetime-local" value="${dateTimeVal}" class="border border-blue-900 p-1 text-xs w-full datetime-input rounded" onchange="updateRowData(this)">
+                    <input type="datetime-local" value="${dateTimeVal}" ${dateLocked} class="border border-blue-900 p-1 text-xs w-full datetime-input rounded" onchange="lockInput(this); updateRowData(this)">
                 </td>
                 <td>
-                    <select class="border border-blue-900 p-1 text-xs w-full amount-type-select rounded" onchange="handleTypeChange(this)">
+                    <select ${typeLocked} class="border border-blue-900 p-1 text-xs w-full amount-type-select rounded" onchange="handleTypeChange(this)">
                         <option value="" ${amountType === '' ? 'selected' : ''} disabled>-- Select Type --</option>
                         <option value="Salary" ${amountType === 'Salary' ? 'selected' : ''}>Salary</option>
                         <option value="Pension" ${amountType === 'Pension' ? 'selected' : ''}>Pension</option>
                         <option value="Other" ${amountType === 'Other' ? 'selected' : ''}>Other</option>
                     </select>
                     <div class="detail-container mt-1 ${amountType === 'Other' ? '' : 'hidden'}">
-                        <input type="text" placeholder="Enter Detail" value="${detailText}" class="border border-blue-900 p-1 text-xs w-full detail-input rounded" onblur="updateRowData(this)">
+                        <input type="text" placeholder="Enter Detail" value="${detailText}" ${detailLocked} class="border border-blue-900 p-1 text-xs w-full detail-input rounded" onblur="lockInput(this); updateRowData(this)">
                     </div>
                 </td>
                 <td><input type="number" value="${received}" ${receivedLocked} class="border border-blue-900 p-1 text-xs w-full received-input rounded" placeholder="0" onblur="lockInput(this);" oninput="handleInputChange();"></td>
                 <td><input type="number" value="${used}" ${usedLocked} class="border border-blue-900 p-1 text-xs w-full used-input rounded" placeholder="0" onblur="lockInput(this);" oninput="handleInputChange();"></td>
                 <td><span class="balance-display font-semibold text-xs">${balance}</span></td>
-                <td><input type="text" value="${remarks}" class="border border-blue-900 p-1 text-xs w-full remarks-input rounded" placeholder="Reason/Where spent" onblur="updateRowData(this)"></td>
+                <td><input type="text" value="${remarks}" ${remarksLocked} class="border border-blue-900 p-1 text-xs w-full remarks-input rounded" placeholder="Reason/Where spent" onblur="lockInput(this); updateRowData(this)"></td>
                 <td class="text-center"><button onclick="deleteRowFromFirebase(this)" class="text-red-600 font-bold text-xs hover:underline">Delete</button></td>
             `;
 
@@ -305,15 +310,22 @@
                 const detailInput = detailContainer.querySelector('.detail-input');
                 if(detailInput) detailInput.value = '';
             }
+            if (selectElement.value.trim() !== '') {
+                selectElement.setAttribute('disabled', true);
+                selectElement.classList.add('bg-gray-100');
+            }
             updateRowData(selectElement);
         }
 
         function lockInput(input) {
             if (input.value.trim() !== '') {
-                input.setAttribute('readonly', true);
+                if (input.tagName === 'SELECT') {
+                    input.setAttribute('disabled', true);
+                } else {
+                    input.setAttribute('readonly', true);
+                }
                 input.classList.add('bg-gray-100');
             }
-            updateRowData(input);
         }
 
         function handleInputChange() {
@@ -418,7 +430,7 @@
                 if (id) {
                     const itemToUpdate = applicationData.find(item => item.id === id);
                     if (itemToUpdate) {
-                        const docRef = window.doc(window.db, "savingsData", id);
+                        const docRef = window.doc(window.doc? window.db : window.db, "savingsData", id);
                         await window.updateDoc(docRef, itemToUpdate);
                     }
                 }
