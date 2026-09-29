@@ -77,10 +77,17 @@
                         <h2 id="viewLedgerName" class="text-sm font-bold text-slate-900"></h2>
                         <p id="viewLedgerPurpose" class="text-xs text-slate-500"></p>
                     </div>
-                    <button onclick="openAddTransactionRow()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded font-medium shadow transition text-xs flex items-center gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
-                        Create New Row
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <!-- MS Word Download Button -->
+                        <button onclick="downloadLedgerWordDoc()" class="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1.5 rounded font-medium shadow transition text-xs flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                            Download Word (.doc)
+                        </button>
+                        <button onclick="openAddTransactionRow()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded font-medium shadow transition text-xs flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+                            Create New Row
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Excel-like Table View with horizontal & vertical freeze scroll -->
@@ -588,6 +595,80 @@
             URL.revokeObjectURL(url);
         };
 
+        // MS Word (.doc) Download Function for Active Ledger
+        window.downloadLedgerWordDoc = function() {
+            const ledger = ledgers.find(l => l.id === activeLedgerId);
+            if (!ledger) return;
+
+            let tableRowsHtml = '';
+            if (ledger.transactions && ledger.transactions.length > 0) {
+                ledger.transactions.forEach(tx => {
+                    const remarksText = tx.remarkType ? `${tx.remarkType}${tx.remarkDetail ? ' (' + tx.remarkDetail + ')' : ''}` : '-';
+                    const imgHtml = tx.proofImage ? `<img src="${tx.proofImage}" width="60" height="60" style="object-fit:cover; border:1px solid #ccc;" />` : '-';
+
+                    tableRowsHtml += `
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #cbd5e1;">${tx.title || '-'}</td>
+                            <td style="padding: 8px; border: 1px solid #cbd5e1;">${tx.date || '-'}</td>
+                            <td style="padding: 8px; border: 1px solid #cbd5e1;">${tx.amount || 0}</td>
+                            <td style="padding: 8px; border: 1px solid #cbd5e1;">${tx.paid || 0}</td>
+                            <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: bold;">${tx.balance || 0}</td>
+                            <td style="padding: 8px; border: 1px solid #cbd5e1;">${remarksText}</td>
+                            <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">${imgHtml}</td>
+                        </tr>
+                    `;
+                });
+            } else {
+                tableRowsHtml = `<tr><td colspan="7" style="padding: 10px; text-align: center;">No transactions found.</td></tr>`;
+            }
+
+            const docHtml = `
+                <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+                <head>
+                    <meta charset='utf-8'>
+                    <title>${ledger.fullName} - Ledger Statement</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; font-size: 12px; color: #1e293b; }
+                        h2 { color: #1e3a8a; margin-bottom: 2px; }
+                        p { margin-top: 0; color: #64748b; font-size: 11px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+                        th { background-color: #0f172a; color: #ffffff; padding: 8px; border: 1px solid #cbd5e1; text-align: left; font-size: 10px; text-transform: uppercase; }
+                    </style>
+                </head>
+                <body>
+                    <h2>${ledger.fullName}</h2>
+                    <p>Purpose: ${ledger.purpose}</p>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Title / Purpose</th>
+                                <th>Date & Time</th>
+                                <th>Amount</th>
+                                <th>Paid</th>
+                                <th>Balance</th>
+                                <th>Remarks</th>
+                                <th>Proof</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableRowsHtml}
+                        </tbody>
+                    </table>
+                </body>
+                </html>
+            `;
+
+            const blob = new Blob(['\ufeff', docHtml], { type: 'application/msword' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${ledger.fullName}_Ledger_Statement.doc`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
+
         window.handleCreateLedger = async function(e) {
             e.preventDefault();
             const fullName = document.getElementById('modalFullName').value;
@@ -637,6 +718,7 @@
             const newTx = {
                 id: 'tx_' + Date.now(),
                 title: '',
+                titleLocked: false,
                 date: formattedDateTime,
                 amount: 0,
                 paid: 0,
@@ -645,7 +727,9 @@
                 paidLocked: false,
                 remarkType: '',
                 remarkDetail: '',
-                proofImage: ''
+                remarkLocked: false,
+                proofImage: '',
+                proofLocked: false
             };
 
             ledger.transactions.push(newTx);
@@ -708,14 +792,14 @@
                 tr.className = "hover:bg-slate-50 transition";
                 
                 const detailInputHtml = tx.remarkType ? `
-                    <input type="text" value="${tx.remarkDetail || ''}" onfocus="isLocalTyping=true" onblur="updateTxField('${tx.id}', 'remarkDetail', this.value)" placeholder="${getRemarkPlaceholder(tx.remarkType)}" class="w-full border border-slate-300 rounded px-2 py-1 text-[11px] outline-none focus:ring-1 focus:ring-blue-500 mt-1">
+                    <input type="text" value="${tx.remarkDetail || ''}" ${tx.remarkLocked ? 'disabled' : ''} onfocus="isLocalTyping=true" onblur="lockFieldOnBlur('${tx.id}', 'remarkDetail', this.value)" placeholder="${getRemarkPlaceholder(tx.remarkType)}" class="w-full border border-slate-300 ${tx.remarkLocked ? 'bg-slate-100' : ''} rounded px-2 py-1 text-[11px] outline-none focus:ring-1 focus:ring-blue-500 mt-1">
                 ` : '';
 
                 const dateOnly = extractDateOnly(tx.date);
                 const pickerDateValue = convertToYYYYMMDD(dateOnly);
 
                 tr.innerHTML = `
-                    <td class="p-1.5"><input type="text" value="${tx.title || ''}" onfocus="isLocalTyping=true" onblur="updateTxField('${tx.id}', 'title', this.value)" class="w-full border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 min-w-[120px]" placeholder="Title/Purpose"></td>
+                    <td class="p-1.5"><input type="text" value="${tx.title || ''}" ${tx.titleLocked ? 'readonly class="w-full border border-slate-300 bg-slate-100 rounded px-2 py-1 text-xs outline-none min-w-[120px]"' : 'onfocus="isLocalTyping=true" onblur="lockFieldOnBlur(\''+tx.id+'\', \'title\', this.value)" class="w-full border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 min-w-[120px]"'} placeholder="Title/Purpose"></td>
                     <td class="p-1.5">
                         <input type="date" value="${pickerDateValue}" onchange="updateDateValue('${tx.id}', this.value)" class="border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 min-w-[120px]" title="Select Date">
                         <div class="text-[10px] text-slate-500 mt-0.5">${tx.date}</div>
@@ -724,7 +808,7 @@
                     <td class="p-1.5"><input type="number" value="${tx.paid}" ${tx.paidLocked ? 'readonly class="w-20 border border-slate-300 bg-slate-100 rounded px-2 py-1 text-xs outline-none"' : 'onfocus="isLocalTyping=true" onblur="lockFieldOnBlur(\''+tx.id+'\', \'paid\', this.value)" class="w-20 border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500"'} ></td>
                     <td class="p-1.5 font-bold text-slate-700 bg-slate-50 whitespace-nowrap" id="bal_${tx.id}">${tx.balance}</td>
                     <td class="p-1.5 min-w-[140px]">
-                        <select onchange="updateRemarkType('${tx.id}', this.value)" class="border border-slate-300 rounded px-2 py-1 text-[11px] outline-none bg-white w-full">
+                        <select ${tx.remarkLocked ? 'disabled class="border border-slate-300 bg-slate-100 rounded px-2 py-1 text-[11px] outline-none w-full"' : 'onchange="updateRemarkType(\''+tx.id+'\', this.value)" class="border border-slate-300 rounded px-2 py-1 text-[11px] outline-none bg-white w-full"'}>
                             <option value="" ${tx.remarkType===''?'selected':''}>-- Select Option --</option>
                             <option value="Jazzcash" ${tx.remarkType==='Jazzcash'?'selected':''}>JazzCash</option>
                             <option value="Easypaisa" ${tx.remarkType==='Easypaisa'?'selected':''}>EasyPaisa</option>
@@ -736,7 +820,7 @@
                     <td class="p-1.5 whitespace-nowrap">
                         <div class="flex items-center gap-1.5">
                             ${tx.proofImage ? `<img src="${tx.proofImage}" onclick="openImageModal('${tx.proofImage}')" class="w-7 h-7 object-cover rounded cursor-pointer border hover:opacity-80 shadow-sm" title="Click to view">` : ''}
-                            <input type="file" accept="image/*" onchange="handleImageUpload(event, '${tx.id}')" class="text-[10px] w-24 text-slate-500 file:mr-1 file:py-0.5 file:px-1.5 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                            ${!tx.proofLocked ? `<input type="file" accept="image/*" onchange="handleImageUpload(event, '${tx.id}')" class="text-[10px] w-24 text-slate-500 file:mr-1 file:py-0.5 file:px-1.5 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">` : '<span class="text-[10px] text-slate-400 font-semibold">Locked</span>'}
                         </div>
                     </td>
                     <td class="p-1.5 text-center">
@@ -759,6 +843,16 @@
             updateTxField(txId, 'remarkType', type);
             if (!type) {
                 updateTxField(txId, 'remarkDetail', '');
+            } else {
+                // Select change hone par locking trigger
+                const ledger = ledgers.find(l => l.id === activeLedgerId);
+                if (ledger) {
+                    const tx = ledger.transactions.find(t => t.id === txId);
+                    if (tx) {
+                        tx.remarkLocked = true;
+                        saveLedgerToFirebase(ledger);
+                    }
+                }
             }
             renderTransactions();
         };
@@ -837,7 +931,16 @@
                     ctx.drawImage(img, 0, 0, width, height);
 
                     const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
-                    updateTxField(txId, 'proofImage', compressedDataUrl);
+                    
+                    const ledger = ledgers.find(l => l.id === activeLedgerId);
+                    if (ledger) {
+                        const tx = ledger.transactions.find(t => t.id === txId);
+                        if (tx) {
+                            tx.proofImage = compressedDataUrl;
+                            tx.proofLocked = true; // Image upload hote hi lock ho jayega
+                            saveLedgerToFirebase(ledger);
+                        }
+                    }
                     renderTransactions();
                 }
             }
