@@ -32,7 +32,12 @@
     <div class="max-w-7xl mx-auto w-full space-y-3">
         
         <!-- Main Header (Navy Blue Color) -->
-        <header class="bg-[#1e3a8a] text-white shadow-sm rounded-lg p-3 sm:p-4 text-center space-y-1">
+        <header class="bg-[#1e3a8a] text-white shadow-sm rounded-lg p-3 sm:p-4 text-center space-y-1 relative">
+            <!-- Back Button: Sirf Laptop / Desktop par show hoga, mobile par hide rahega -->
+            <button onclick="selectLedgerFromDropdown('')" class="hidden sm:flex items-center gap-1 absolute left-3 top-1/2 -translate-y-1/2 bg-blue-700 hover:bg-blue-800 text-white px-3 py-1.5 rounded text-xs font-medium shadow transition">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                Back
+            </button>
             <h1 class="text-lg sm:text-xl md:text-2xl font-bold tracking-wide">CREDIT AND DEBIT LEDGER ACCOUNT SYSTEM</h1>
             <p class="text-[11px] sm:text-xs text-blue-100">Manage your credit records, payments, and financial proof securely.</p>
         </header>
@@ -294,9 +299,11 @@
         window.selectLedgerFromDropdown = function(id, preserveCursor = false) {
             const removeBtn = document.getElementById('removeLedgerBtn');
             const personalDataBtn = document.getElementById('personalDataBtn');
+            const selectElem = document.getElementById('topLedgerSelect');
             
             if (!id) {
                 activeLedgerId = null;
+                selectElem.value = "";
                 document.getElementById('noLedgerSelected').classList.remove('hidden');
                 document.getElementById('activeLedgerView').classList.add('hidden');
                 removeBtn.classList.add('hidden');
@@ -307,6 +314,7 @@
             }
 
             activeLedgerId = id;
+            selectElem.value = id;
             const ledger = ledgers.find(l => l.id === id);
             if (!ledger) return;
 
@@ -881,9 +889,8 @@
 
             const oldTime = tx.date.includes(' ') ? tx.date.split(' ').slice(1).join(' ') : '12:00:00 AM';
             tx.date = `${formattedDateOnly} ${oldTime}`;
-            tx.dateLocked = true; // Ab chahe current date ho ya koi aur, date select hote hi lock ho jayegi
+            tx.dateLocked = true;
             
-            // Recalculate balance and re-render so that row automatically moves to its sorted position
             calculateRunningBalances(ledger);
             saveLedgerToFirebase(ledger);
             renderTransactions();
@@ -959,7 +966,7 @@
                         const tx = ledger.transactions.find(t => t.id === txId);
                         if (tx) {
                             tx.proofImage = compressedDataUrl;
-                            tx.proofLocked = true; // Image upload hote hi lock ho jayega
+                            tx.proofLocked = true;
                             saveLedgerToFirebase(ledger);
                         }
                     }
