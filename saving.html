@@ -72,7 +72,10 @@
                 </div>
             </div>
 
-            <div>
+            <div class="flex items-center gap-2">
+                <button onclick="downloadAsWord()" class="bg-green-700 text-white px-3 py-1 text-xs uppercase font-semibold rounded hover:bg-green-800">
+                    Download as Word (.doc)
+                </button>
                 <button onclick="addNewRowToFirebase()" class="bg-blue-900 text-white px-4 py-1 text-xs uppercase font-semibold rounded hover:bg-blue-800">
                     Create New Row
                 </button>
@@ -501,6 +504,101 @@
 
         function filterData() {
             loadTableData();
+        }
+
+        function downloadAsWord() {
+            const monthSelect = document.getElementById('monthFilter');
+            const yearSelect = document.getElementById('yearFilter');
+            const monthText = monthSelect.options[monthSelect.selectedIndex].text;
+            const yearText = yearSelect.options[yearSelect.selectedIndex].text;
+
+            let fileName = `Financial_Report_${monthText}_${yearText}.doc`.replace(/\s+/g, '_');
+
+            let htmlContent = `
+                <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+                <head>
+                    <meta charset='utf-8'>
+                    <title>Financial Report</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; font-size: 11pt; }
+                        h2 { color: #1e3a8a; text-align: center; margin-bottom: 20px; }
+                        table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+                        th, td { border: 1px solid #1e3a8a; padding: 8px; text-align: left; }
+                        th { background-color: #1e3a8a; color: white; font-weight: bold; }
+                    </style>
+                </head>
+                <body>
+                    <h2>Personal Financial Saving & Expense Report</h2>
+                    <p><b>Filter applied:</b> Month: ${monthText} | Year: ${yearText}</p>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date and Time</th>
+                                <th>Amount Type</th>
+                                <th>Amount Received</th>
+                                <th>Used</th>
+                                <th>Balance</th>
+                                <th>Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            const rows = document.querySelectorAll('#tableBody tr');
+            rows.forEach(row => {
+                const datetimeInput = row.querySelector('.datetime-input');
+                let dateTimeVal = datetimeInput ? datetimeInput.value.replace('T', ' ') : '';
+                
+                const amountTypeSelect = row.querySelector('.amount-type-select');
+                let amountTypeVal = amountTypeSelect ? amountTypeSelect.value : '';
+                const detailInput = row.querySelector('.detail-input');
+                if (amountTypeVal === 'Other' && detailInput && detailInput.value) {
+                    amountTypeVal += ` (${detailInput.value})`;
+                }
+
+                const receivedInput = row.querySelector('.received-input');
+                let receivedVal = receivedInput ? receivedInput.value : '0';
+
+                const usedInput = row.querySelector('.used-input');
+                let usedVal = usedInput ? usedInput.value : '0';
+
+                const balanceDisplay = row.querySelector('.balance-display');
+                let balanceVal = balanceDisplay ? balanceDisplay.textContent : '0';
+
+                const remarksInput = row.querySelector('.remarks-input');
+                let remarksVal = remarksInput ? remarksInput.value : '';
+
+                htmlContent += `
+                    <tr>
+                        <td>${dateTimeVal}</td>
+                        <td>${amountTypeVal}</td>
+                        <td>${receivedVal}</td>
+                        <td>${usedVal}</td>
+                        <td>${balanceVal}</td>
+                        <td>${remarksVal}</td>
+                    </tr>
+                `;
+            });
+
+            htmlContent += `
+                        </tbody>
+                    </table>
+                </body>
+                </html>
+            `;
+
+            const blob = new Blob(['\ufeff' + htmlContent], {
+                type: 'application/msword'
+            });
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
     </script>
 </body>
