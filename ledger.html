@@ -32,12 +32,7 @@
     <div class="max-w-7xl mx-auto w-full space-y-3">
         
         <!-- Main Header (Navy Blue Color) -->
-        <header class="bg-[#1e3a8a] text-white shadow-sm rounded-lg p-3 sm:p-4 text-center space-y-1 relative">
-            <!-- Back Button: Sirf Laptop / Desktop par show hoga, mobile par hide rahega -->
-            <button onclick="selectLedgerFromDropdown('')" class="hidden sm:flex items-center gap-1 absolute left-3 top-1/2 -translate-y-1/2 bg-blue-700 hover:bg-blue-800 text-white px-3 py-1.5 rounded text-xs font-medium shadow transition">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-                Back
-            </button>
+        <header class="bg-[#1e3a8a] text-white shadow-sm rounded-lg p-3 sm:p-4 text-center space-y-1">
             <h1 class="text-lg sm:text-xl md:text-2xl font-bold tracking-wide">CREDIT AND DEBIT LEDGER ACCOUNT SYSTEM</h1>
             <p class="text-[11px] sm:text-xs text-blue-100">Manage your credit records, payments, and financial proof securely.</p>
         </header>
@@ -45,6 +40,11 @@
         <!-- Top Ledger Selection Dropdown Bar & Buttons -->
         <div class="bg-white shadow-sm rounded-lg p-3 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div class="flex items-center gap-2 w-full sm:w-auto flex-1">
+                <!-- Back Button: Sirf laptop/desktop par show hoga (hidden md:flex) aur index.html par jayega -->
+                <a href="index.html" class="hidden md:flex bg-slate-700 hover:bg-slate-800 text-white px-3 py-1.5 rounded text-xs font-medium shadow transition items-center gap-1 whitespace-nowrap">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                    Back to Main
+                </a>
                 <label for="topLedgerSelect" class="text-xs font-semibold text-slate-700 whitespace-nowrap">Select Ledger:</label>
                 <select id="topLedgerSelect" onchange="selectLedgerFromDropdown(this.value)" class="w-full sm:w-72 border rounded px-2.5 py-1.5 bg-white outline-none focus:ring-1 focus:ring-blue-500 text-xs font-medium">
                     <option value="">-- Choose a Ledger --</option>
@@ -299,11 +299,9 @@
         window.selectLedgerFromDropdown = function(id, preserveCursor = false) {
             const removeBtn = document.getElementById('removeLedgerBtn');
             const personalDataBtn = document.getElementById('personalDataBtn');
-            const selectElem = document.getElementById('topLedgerSelect');
             
             if (!id) {
                 activeLedgerId = null;
-                selectElem.value = "";
                 document.getElementById('noLedgerSelected').classList.remove('hidden');
                 document.getElementById('activeLedgerView').classList.add('hidden');
                 removeBtn.classList.add('hidden');
@@ -314,7 +312,6 @@
             }
 
             activeLedgerId = id;
-            selectElem.value = id;
             const ledger = ledgers.find(l => l.id === id);
             if (!ledger) return;
 
