@@ -35,15 +35,19 @@
 <body class="bg-white text-gray-900 p-4 md:p-6">
 
     <div class="max-w-7xl mx-auto">
-        <!-- Main Heading with Navy Blue Shade & Back Button for Laptop/Desktop -->
-        <div class="relative mb-6">
-            <!-- Back Button: Only visible on desktop/laptop screens (hidden on mobile) -->
-            <button onclick="window.history.back()" class="hidden md:inline-flex items-center gap-1 absolute left-3 top-1/2 -translate-y-1/2 bg-blue-800 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-blue-700 transition">
-                ← Back
-            </button>
-            <h1 class="text-center text-xl font-bold uppercase tracking-wide bg-blue-900 text-white py-3 px-4 rounded shadow">
+        <!-- Main Heading with Navy Blue Shade & Back Button -->
+        <div class="relative mb-6 bg-blue-900 text-white py-3 px-4 rounded shadow flex items-center justify-between">
+            <!-- Back Button: Hidden on Mobile, Visible on Desktop (md and above) -->
+            <a href="index.html" onclick="history.back(); return false;" class="hidden md:inline-block bg-white text-blue-900 px-3 py-1 text-xs font-bold uppercase rounded hover:bg-gray-200 transition">
+                &larr; Back
+            </a>
+            
+            <h1 class="text-center text-xl font-bold uppercase tracking-wide flex-1 text-center">
                 Comprehensive Personal Financial Saving & Expense Management System
             </h1>
+            
+            <!-- Spacer to align title center on desktop -->
+            <div class="hidden md:block w-16"></div>
         </div>
 
         <!-- Top Controls: Separate Month & Year Filters & Actions -->
@@ -80,10 +84,9 @@
 
             <div class="flex items-center gap-2">
                 <!-- Download Word Button -->
-                <button onclick="downloadWordDocument()" class="bg-emerald-700 text-white px-4 py-1 text-xs uppercase font-semibold rounded hover:bg-emerald-800 transition">
+                <button onclick="downloadAsWord()" class="bg-green-700 text-white px-4 py-1 text-xs uppercase font-semibold rounded hover:bg-green-800 transition">
                     Download Word
                 </button>
-                <!-- Create New Row Button -->
                 <button onclick="addNewRowToFirebase()" class="bg-blue-900 text-white px-4 py-1 text-xs uppercase font-semibold rounded hover:bg-blue-800 transition">
                     Create New Row
                 </button>
@@ -379,10 +382,9 @@
         }
 
         async function deleteRowFromFirebase(btn) {
-            // Confirmation prompt added here
             const confirmation = confirm("Are you sure you want to delete this row?");
             if (!confirmation) {
-                return; // Agar user Cancel karde toh delete process ruk jaye ga
+                return;
             }
 
             const row = btn.closest('tr');
@@ -514,97 +516,107 @@
             loadTableData();
         }
 
-        // Word Download Functionality
-        function downloadWordDocument() {
-            const monthSelect = document.getElementById('monthFilter');
-            const yearSelect = document.getElementById('yearFilter');
-            
-            const monthText = monthSelect.options[monthSelect.selectedIndex].text;
-            const yearText = yearSelect.value;
-            
-            let reportTitle = "Financial Report";
-            if (monthSelect.value !== 'ALL' || yearSelect.value !== 'ALL') {
-                reportTitle += ` - ${monthText} ${yearSelect.value !== 'ALL' ? yearText : ''}`;
-            } else {
-                reportTitle += " - All Months";
-            }
+        // Function to Download Table Data as MS Word Document (.doc)
+        function downloadAsWord() {
+            const selectedMonth = document.getElementById('monthFilter').value;
+            const selectedYear = document.getElementById('yearFilter').value;
 
-            // Extract table rows currently displayed (respecting filter)
-            const rows = document.querySelectorAll('#tableBody tr');
-            let tableRowsHtml = '';
-
-            rows.forEach(row => {
-                const dateTime = row.querySelector('.datetime-input')?.value.replace('T', ' ') || '';
-                const typeSelect = row.querySelector('.amount-type-select');
-                let typeVal = typeSelect ? typeSelect.value : '';
-                const detailVal = row.querySelector('.detail-input')?.value || '';
-                if (typeVal === 'Other' && detailVal) {
-                    typeVal += ` (${detailVal})`;
-                }
-
-                const received = row.querySelector('.received-input')?.value || '0';
-                const used = row.querySelector('.used-input')?.value || '0';
-                const balance = row.querySelector('.balance-display')?.textContent || '0';
-                const remarks = row.querySelector('.remarks-input')?.value || '';
-
-                tableRowsHtml += `
-                    <tr>
-                        <td style="border: 1px solid #1e3a8a; padding: 6px 8px;">${dateTime}</td>
-                        <td style="border: 1px solid #1e3a8a; padding: 6px 8px;">${typeVal}</td>
-                        <td style="border: 1px solid #1e3a8a; padding: 6px 8px; text-align: right;">${received}</td>
-                        <td style="border: 1px solid #1e3a8a; padding: 6px 8px; text-align: right;">${used}</td>
-                        <td style="border: 1px solid #1e3a8a; padding: 6px 8px; text-align: right;">${balance}</td>
-                        <td style="border: 1px solid #1e3a8a; padding: 6px 8px;">${remarks}</td>
-                    </tr>
-                `;
-            });
-
-            // HTML content with styling for Word export
-            const wordContent = `
-                <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+            // Header for MS Word document
+            let htmlHeader = `
+                <html xmlns:o='urn:schemas-microsoft-com:office:office' 
+                      xmlns:w='urn:schemas-microsoft-com:office:word' 
+                      xmlns='http://www.w3.org/TR/REC-html40'>
                 <head>
                     <meta charset='utf-8'>
-                    <title>${reportTitle}</title>
+                    <title>Financial Report</title>
                     <style>
                         body { font-family: Arial, sans-serif; font-size: 11pt; }
-                        h2 { color: #1e3a8a; text-align: center; text-transform: uppercase; margin-bottom: 20px; }
-                        table { border-collapse: collapse; width: 100%; font-size: 10pt; }
-                        th { background-color: #1e3a8a; color: white; border: 1px solid #1e3a8a; padding: 8px; text-align: left; }
+                        h2 { text-align: center; color: #1e3a8a; text-transform: uppercase; }
+                        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+                        th, td { border: 1px solid #1e3a8a; padding: 8px; text-align: left; }
+                        th { background-color: #1e3a8a; color: white; text-transform: uppercase; }
                     </style>
                 </head>
                 <body>
-                    <h2>${reportTitle}</h2>
+                    <h2>Financial Report (${selectedMonth === 'ALL' ? 'All Months' : 'Month: ' + selectedMonth} - ${selectedYear === 'ALL' ? 'All Years' : 'Year: ' + selectedYear})</h2>
                     <table>
                         <thead>
                             <tr>
-                                <th>Date & Time</th>
+                                <th>Date and Time</th>
                                 <th>Amount Type</th>
-                                <th style="text-align: right;">Received</th>
-                                <th style="text-align: right;">Used</th>
-                                <th style="text-align: right;">Balance</th>
+                                <th>Amount Received</th>
+                                <th>Used</th>
+                                <th>Balance</th>
                                 <th>Remarks</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${tableRowsHtml}
+            `;
+
+            let htmlBody = "";
+
+            // Get filtered rows matching current selection
+            applicationData.forEach(item => {
+                let showRow = false;
+                if (!item.dateTime || item.dateTime.trim() === "") {
+                    showRow = true;
+                } else {
+                    let datePart = item.dateTime.split(' ')[0];
+                    if (datePart.includes('-')) {
+                        let parts = datePart.split('-');
+                        if (parts.length === 3) {
+                            let itemMonth = parts[1];
+                            let itemYear = parts[2];
+
+                            let matchesMonth = (selectedMonth === 'ALL' || itemMonth === selectedMonth);
+                            let matchesYear = (selectedYear === 'ALL' || itemYear === selectedYear);
+
+                            if (matchesMonth && matchesYear) {
+                                showRow = true;
+                            }
+                        }
+                    }
+                }
+
+                if (showRow) {
+                    let typeDisplay = item.amountType || '';
+                    if (item.amountType === 'Other' && item.detailText) {
+                        typeDisplay += ` (${item.detailText})`;
+                    }
+
+                    htmlBody += `
+                        <tr>
+                            <td>${item.dateTime || ''}</td>
+                            <td>${typeDisplay}</td>
+                            <td>${item.received || '0'}</td>
+                            <td>${item.used || '0'}</td>
+                            <td>${item.balance || '0'}</td>
+                            <td>${item.remarks || ''}</td>
+                        </tr>
+                    `;
+                }
+            });
+
+            let htmlFooter = `
                         </tbody>
                     </table>
                 </body>
                 </html>
             `;
 
-            // Create Blob and trigger download
-            const blob = new Blob(['\ufeff' + wordContent], {
+            let sourceHTML = htmlHeader + htmlBody + htmlFooter;
+            
+            let blob = new Blob(['\ufeff' + sourceHTML], {
                 type: 'application/msword'
             });
-
-            const fileName = `Financial_Report_${monthSelect.value}_${yearSelect.value}.doc`;
-            const downloadLink = document.createElement('a');
-            downloadLink.href = URL.createObjectURL(blob);
-            downloadLink.download = fileName;
-            document.body.appendChild(downloadLink);
-            downloadLink.click();
-            document.body.removeChild(downloadLink);
+            
+            let url = URL.createObjectURL(blob);
+            let a = document.createElement('a');
+            a.href = url;
+            a.download = `Financial_Report_${selectedMonth}_${selectedYear}.doc`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         }
     </script>
 </body>
