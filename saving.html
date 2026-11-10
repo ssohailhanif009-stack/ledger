@@ -148,6 +148,33 @@
     <script>
         let applicationData = [];
 
+        // Helper function to format date as "DD-Month-YYYY Time" (e.g., 11-November-2026 14:30)
+        function formatReadableDateTime(dateTimeStr) {
+            if (!dateTimeStr) return '';
+            let parts = dateTimeStr.split(' ');
+            let dmy = parts[0];
+            let timePart = parts[1] || '';
+
+            if (dmy && dmy.includes('-')) {
+                let p = dmy.split('-');
+                if (p.length === 3) {
+                    let day = p[0];
+                    let monthNum = p[1];
+                    let year = p[2];
+                    
+                    const monthsNames = {
+                        "01": "January", "02": "February", "03": "March", "04": "April",
+                        "05": "May", "06": "June", "07": "July", "08": "August",
+                        "09": "September", "10": "October", "11": "November", "12": "December"
+                    };
+
+                    let monthName = monthsNames[monthNum] || monthNum;
+                    return `${day}-${monthName}-${year}${timePart ? ' ' + timePart : ''}`;
+                }
+            }
+            return dateTimeStr;
+        }
+
         function populateYearFilterOptions() {
             const yearSelect = document.getElementById('yearFilter');
             const currentSelectedYear = yearSelect.value;
@@ -441,7 +468,7 @@
                 applicationData[index].amountType = amountType;
                 applicationData[index].detailText = detailText;
                 applicationData[index].received = received;
-                applicationData[index].used = used;
+                applicationData.index.used = used;
                 applicationData[index].remarks = remarks;
             }
 
@@ -451,7 +478,7 @@
 
             try {
                 if (id) {
-                    const itemToUpdate = applicationData.find(item => item.id === id);
+                    const itemToUpdate = applicationData.applicationData ? applicationData.find(item => item.id === id) : applicationData.find(item => item.id === id);
                     if (itemToUpdate) {
                         const docRef = window.doc(window.db, "savingsData", id);
                         await window.updateDoc(docRef, itemToUpdate);
@@ -516,7 +543,7 @@
             loadTableData();
         }
 
-        // Function to Download Table Data as MS Word Document (.doc)
+        // Function to Download Table Data as MS Word Document (.doc) with updated date format (Date Month Year)
         function downloadAsWord() {
             const selectedMonth = document.getElementById('monthFilter').value;
             const selectedYear = document.getElementById('yearFilter').value;
@@ -584,9 +611,12 @@
                         typeDisplay += ` (${item.detailText})`;
                     }
 
+                    // Date format ko "date month year" (e.g., 11-November-2026) me convert karna
+                    let formattedDateForWord = formatReadableDateTime(item.dateTime);
+
                     htmlBody += `
                         <tr>
-                            <td>${item.dateTime || ''}</td>
+                            <td>${formattedDateForWord}</td>
                             <td>${typeDisplay}</td>
                             <td>${item.received || '0'}</td>
                             <td>${item.used || '0'}</td>
