@@ -222,11 +222,7 @@
                 let received = parseFloat(item.received) || 0;
                 let used = parseFloat(item.used) || 0;
 
-                if (index === 0) {
-                    runningBalance = received - used;
-                } else {
-                    runningBalance = runningBalance + received - used;
-                }
+                runningBalance = runningBalance + received - used;
                 item.balance = String(runningBalance);
             });
         }
@@ -335,8 +331,8 @@
                         <input type="text" placeholder="Enter Detail" value="${detailText}" ${detailLocked} class="border border-blue-900 p-1 text-xs w-full detail-input rounded" onblur="lockInput(this); updateRowData(this)">
                     </div>
                 </td>
-                <td><input type="number" value="${received}" ${receivedLocked} class="border border-blue-900 p-1 text-xs w-full received-input rounded" placeholder="0" onblur="lockInput(this);" oninput="handleInputChange();"></td>
-                <td><input type="number" value="${used}" ${usedLocked} class="border border-blue-900 p-1 text-xs w-full used-input rounded" placeholder="0" onblur="lockInput(this);" oninput="handleInputChange();"></td>
+                <td><input type="number" value="${received}" ${receivedLocked} class="border border-blue-900 p-1 text-xs w-full received-input rounded" placeholder="0" onblur="lockInput(this); updateRowData(this);" oninput="handleInputChange();"></td>
+                <td><input type="number" value="${used}" ${usedLocked} class="border border-blue-900 p-1 text-xs w-full used-input rounded" placeholder="0" onblur="lockInput(this); updateRowData(this);" oninput="handleInputChange();"></td>
                 <td><span class="balance-display font-semibold text-xs">${balance}</span></td>
                 <td><input type="text" value="${remarks}" ${remarksLocked} class="border border-blue-900 p-1 text-xs w-full remarks-input rounded" placeholder="Reason/Where spent" onblur="lockInput(this); updateRowData(this)"></td>
                 <td class="text-center"><button onclick="deleteRowFromFirebase(this)" class="text-red-600 font-bold text-xs hover:underline">Delete</button></td>
@@ -377,7 +373,6 @@
             syncTableToApplicationData();
             calculateGlobalBalances();
             updateAllDisplayedBalances();
-            saveAllDataToFirebase();
         }
 
         function syncTableToApplicationData() {
@@ -388,8 +383,8 @@
                 if (item) {
                     const receivedInput = row.querySelector('.received-input');
                     const usedInput = row.querySelector('.used-input');
-                    item.received = receivedInput ? receivedInput.value : '';
-                    item.used = usedInput ? usedInput.value : '';
+                    item.received = receivedInput ? (receivedInput.value !== '' ? String(parseFloat(receivedInput.value) || 0) : '') : '';
+                    item.used = usedInput ? (usedInput.value !== '' ? String(parseFloat(usedInput.value) || 0) : '') : '';
                 }
             });
         }
@@ -456,9 +451,9 @@
             const detailInput = row.querySelector('.detail-input');
             const detailText = detailInput ? detailInput.value : '';
             const receivedInput = row.querySelector('.received-input');
-            const received = receivedInput ? receivedInput.value : '';
+            const received = receivedInput && receivedInput.value !== '' ? String(parseFloat(receivedInput.value) || 0) : '';
             const usedInput = row.querySelector('.used-input');
-            const used = usedInput ? usedInput.value : '';
+            const used = usedInput && usedInput.value !== '' ? String(parseFloat(usedInput.value) || 0) : '';
             const remarksInput = row.querySelector('.remarks-input');
             const remarks = remarksInput ? remarksInput.value : '';
 
@@ -468,7 +463,7 @@
                 applicationData[index].amountType = amountType;
                 applicationData[index].detailText = detailText;
                 applicationData[index].received = received;
-                applicationData.index.used = used;
+                applicationData[index].used = used;
                 applicationData[index].remarks = remarks;
             }
 
@@ -478,7 +473,7 @@
 
             try {
                 if (id) {
-                    const itemToUpdate = applicationData.applicationData ? applicationData.find(item => item.id === id) : applicationData.find(item => item.id === id);
+                    const itemToUpdate = applicationData.find(item => item.id === id);
                     if (itemToUpdate) {
                         const docRef = window.doc(window.db, "savingsData", id);
                         await window.updateDoc(docRef, itemToUpdate);
