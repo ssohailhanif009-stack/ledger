@@ -35,10 +35,16 @@
 <body class="bg-white text-gray-900 p-4 md:p-6">
 
     <div class="max-w-7xl mx-auto">
-        <!-- Main Heading with Navy Blue Shade -->
-        <h1 class="text-center text-xl font-bold uppercase tracking-wide mb-6 bg-blue-900 text-white py-3 px-4 rounded shadow">
-            Comprehensive Personal Financial Saving & Expense Management System
-        </h1>
+        <!-- Main Heading with Navy Blue Shade & Back Button -->
+        <div class="flex items-center justify-between bg-blue-900 text-white p-3 rounded shadow mb-6">
+            <button onclick="window.location.href='index.html'" class="bg-white text-blue-900 hover:bg-gray-100 font-bold px-3 py-1 text-xs rounded transition flex items-center gap-1">
+                &#8592; Back to Main
+            </button>
+            <h1 class="text-center text-lg md:text-xl font-bold uppercase tracking-wide flex-1">
+                Comprehensive Personal Financial Saving & Expense Management System
+            </h1>
+            <div class="w-20"></div> <!-- Spacer for layout balance -->
+        </div>
 
         <!-- Top Controls: Separate Month & Year Filters & Actions -->
         <div class="flex flex-wrap items-center justify-between gap-4 mb-4 bg-blue-50 p-3 border border-blue-900 rounded">
@@ -73,8 +79,9 @@
             </div>
 
             <div class="flex items-center gap-2">
-                <button onclick="downloadAsWord()" class="bg-green-700 text-white px-3 py-1 text-xs uppercase font-semibold rounded hover:bg-green-800">
-                    Download as Word (.doc)
+                <!-- Download MS Word Button -->
+                <button onclick="downloadAsWord()" class="bg-emerald-700 text-white px-3 py-1 text-xs uppercase font-semibold rounded hover:bg-emerald-800 flex items-center gap-1">
+                    📄 Download Word Doc
                 </button>
                 <button onclick="addNewRowToFirebase()" class="bg-blue-900 text-white px-4 py-1 text-xs uppercase font-semibold rounded hover:bg-blue-800">
                     Create New Row
@@ -371,10 +378,9 @@
         }
 
         async function deleteRowFromFirebase(btn) {
-            // Confirmation prompt added here
             const confirmation = confirm("Are you sure you want to delete this row?");
             if (!confirmation) {
-                return; // Agar user Cancel karde toh delete process ruk jaye ga
+                return;
             }
 
             const row = btn.closest('tr');
@@ -506,95 +512,117 @@
             loadTableData();
         }
 
+        // New Feature: Download Data to MS Word (.doc)
         function downloadAsWord() {
             const monthSelect = document.getElementById('monthFilter');
             const yearSelect = document.getElementById('yearFilter');
+
             const monthText = monthSelect.options[monthSelect.selectedIndex].text;
             const yearText = yearSelect.options[yearSelect.selectedIndex].text;
+            const selectedMonthVal = monthSelect.value;
+            const selectedYearVal = yearSelect.value;
 
-            let fileName = `Financial_Report_${monthText}_${yearText}.doc`.replace(/\s+/g, '_');
+            // Filter filtered items
+            let filteredList = applicationData.filter(item => {
+                if (!item.dateTime || item.dateTime.trim() === "") return true;
+                let datePart = item.dateTime.split(' ')[0];
+                if (datePart.includes('-')) {
+                    let parts = datePart.split('-');
+                    if (parts.length === 3) {
+                        let m = parts[1];
+                        let y = parts[2];
+                        let matchesM = (selectedMonthVal === 'ALL' || m === selectedMonthVal);
+                        let matchesY = (selectedYearVal === 'ALL' || y === selectedYearVal);
+                        return matchesM && matchesY;
+                    }
+                }
+                return true;
+            });
 
-            let htmlContent = `
+            if (filteredList.length === 0) {
+                alert("No data available to export for selected filter!");
+                return;
+            }
+
+            let totalReceived = 0;
+            let totalUsed = 0;
+
+            let tableRowsHtml = "";
+            filteredList.forEach(item => {
+                let rec = parseFloat(item.received) || 0;
+                let usd = parseFloat(item.used) || 0;
+                totalReceived += rec;
+                totalUsed += usd;
+
+                let typeLabel = item.amountType || '-';
+                if (item.amountType === 'Other' && item.detailText) {
+                    typeLabel += ` (${item.detailText})`;
+                }
+
+                tableRowsHtml += `
+                    <tr>
+                        <td style="border:1px solid #1e3a8a; padding:8px;">${item.dateTime || '-'}</td>
+                        <td style="border:1px solid #1e3a8a; padding:8px;">${typeLabel}</td>
+                        <td style="border:1px solid #1e3a8a; padding:8px;">${item.received || '0'}</td>
+                        <td style="border:1px solid #1e3a8a; padding:8px;">${item.used || '0'}</td>
+                        <td style="border:1px solid #1e3a8a; padding:8px; font-weight:bold;">${item.balance || '0'}</td>
+                        <td style="border:1px solid #1e3a8a; padding:8px;">${item.remarks || '-'}</td>
+                    </tr>
+                `;
+            });
+
+            const docHTML = `
                 <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
                 <head>
                     <meta charset='utf-8'>
                     <title>Financial Report</title>
                     <style>
                         body { font-family: Arial, sans-serif; font-size: 11pt; }
-                        h2 { color: #1e3a8a; text-align: center; margin-bottom: 20px; }
-                        table { border-collapse: collapse; width: 100%; margin-top: 10px; }
-                        th, td { border: 1px solid #1e3a8a; padding: 8px; text-align: left; }
-                        th { background-color: #1e3a8a; color: white; font-weight: bold; }
+                        h2 { text-align: center; color: #1e3a8a; text-transform: uppercase; margin-bottom: 5px; }
+                        p.subtitle { text-align: center; font-weight: bold; color: #333; margin-top: 0; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+                        th { background-color: #1e3a8a; color: white; border: 1px solid #1e3a8a; padding: 8px; text-align: left; font-size: 10pt; }
+                        td { font-size: 10pt; }
+                        .summary { margin-top: 20px; font-size: 11pt; font-weight: bold; }
                     </style>
                 </head>
                 <body>
-                    <h2>Personal Financial Saving & Expense Report</h2>
-                    <p><b>Filter applied:</b> Month: ${monthText} | Year: ${yearText}</p>
+                    <h2>Financial Statement Report</h2>
+                    <p class="subtitle">Filter: ${monthText} | Year: ${yearText}</p>
+                    
                     <table>
                         <thead>
                             <tr>
-                                <th>Date and Time</th>
+                                <th>Date & Time</th>
                                 <th>Amount Type</th>
-                                <th>Amount Received</th>
+                                <th>Received</th>
                                 <th>Used</th>
                                 <th>Balance</th>
                                 <th>Remarks</th>
                             </tr>
                         </thead>
                         <tbody>
-            `;
-
-            const rows = document.querySelectorAll('#tableBody tr');
-            rows.forEach(row => {
-                const datetimeInput = row.querySelector('.datetime-input');
-                let dateTimeVal = datetimeInput ? datetimeInput.value.replace('T', ' ') : '';
-                
-                const amountTypeSelect = row.querySelector('.amount-type-select');
-                let amountTypeVal = amountTypeSelect ? amountTypeSelect.value : '';
-                const detailInput = row.querySelector('.detail-input');
-                if (amountTypeVal === 'Other' && detailInput && detailInput.value) {
-                    amountTypeVal += ` (${detailInput.value})`;
-                }
-
-                const receivedInput = row.querySelector('.received-input');
-                let receivedVal = receivedInput ? receivedInput.value : '0';
-
-                const usedInput = row.querySelector('.used-input');
-                let usedVal = usedInput ? usedInput.value : '0';
-
-                const balanceDisplay = row.querySelector('.balance-display');
-                let balanceVal = balanceDisplay ? balanceDisplay.textContent : '0';
-
-                const remarksInput = row.querySelector('.remarks-input');
-                let remarksVal = remarksInput ? remarksInput.value : '';
-
-                htmlContent += `
-                    <tr>
-                        <td>${dateTimeVal}</td>
-                        <td>${amountTypeVal}</td>
-                        <td>${receivedVal}</td>
-                        <td>${usedVal}</td>
-                        <td>${balanceVal}</td>
-                        <td>${remarksVal}</td>
-                    </tr>
-                `;
-            });
-
-            htmlContent += `
+                            ${tableRowsHtml}
                         </tbody>
                     </table>
+
+                    <div class="summary">
+                        <p>Total Amount Received: ${totalReceived}</p>
+                        <p>Total Amount Used: ${totalUsed}</p>
+                        <p>Net Ending Balance: ${totalReceived - totalUsed}</p>
+                    </div>
                 </body>
                 </html>
             `;
 
-            const blob = new Blob(['\ufeff' + htmlContent], {
+            const blob = new Blob(['\ufeff', docHTML], {
                 type: 'application/msword'
             });
 
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = fileName;
+            a.download = `Financial_Report_${monthText}_${yearText}.doc`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
