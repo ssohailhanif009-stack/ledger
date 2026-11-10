@@ -970,6 +970,7 @@
         };
 
         window.deleteTransaction = function(txId) {
+            if (!confirm("Are you sure you want to delete this transaction row?")) return;
             const ledger = ledgers.find(l => l.id === activeLedgerId);
             if (!ledger) return;
             ledger.transactions = ledger.transactions.filter(t => t.id !== txId);
